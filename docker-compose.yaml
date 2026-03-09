@@ -1,0 +1,29 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./services/api/Dockerfile
+    user:
+      - "1000:1000"
+    ports:
+      - 8000:8000
+    volumes:
+      - ./volumes/game_data:/game_data
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  redis:
+    build:
+      context: .
+      dockerfile: ./services/redis/Dockerfile
+    ports:
+      - 6379:6379
+    volumes:
+      - ./volumes/redis_data:/data
+
+volumes:
+  game_data:
+  redis_data:
