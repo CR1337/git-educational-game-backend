@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
-#include <string.h>
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -11,23 +10,23 @@
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
+#include <pty.h>
+#include <termios.h>
+#include <errno.h>
 
 #include "debug.h"
+#include "init.h"
 #include "communication.h"
+#include "util.h"
 
 #pragma region STATE 
 
 enum git_state_t { 
     NOT_RUNNING = 0, 
     RUNNING, 
-    WAIT_FOR_EDITOR_CONTENT, 
-    WAIT_FOR_STDIN 
+    WAIT_FOR_EDITOR_CONTENT
 };
 struct state_t {
-    // ids
-    char *game_id;
-    char *git_session_id;
-
     // ipc
     char *server_in_fifo_name;
     bool server_in_fifo_created;
@@ -58,87 +57,69 @@ struct state_t {
     // poll
     struct pollfd sigterm_pollfd;
     struct pollfd sigchld_pollfd;
-    struct pollfd git_stdin_pollfd;
     struct pollfd editor_simulator_fifo_pollfd;
     struct pollfd server_fifo_pollfd;
 
     // git
+    char *git_executable;
     size_t git_argc;
     char **git_argv;
     char *git_editor;
     pid_t git_pid;
     enum git_state_t git_state;
-
+    char git_editor_filename[BUFFER_SIZE];
+    int git_returncode;
 };
 static struct state_t state = { 0 };
 
 #pragma endregion
 
-# pragma region CONFIGURATION
+#pragma region CONFIGURATION
 
-enum argument_type_t { STRING, NUMBER, STRING_LIST };
-struct argument_config_t {
-    const char *name;
-    const enum argument_type_t argument_type;
-    int offset;
-    union {
-        char **string;
-        size_t *number;
-        char ***string_list;
-    };
-};
-const static size_t N_ARGUMENTS = 7;
-const static struct argument_config_t argument_configs[N_ARGUMENTS] = {
-    {
-        .name = "game_id",
-        .argument_type = STRING,
-        .offset = 1,
-        .string = &state.game_id
-    },
-    {
-        .name = "git_session_id",
-        .argument_type = STRING,
-        .offset = 2,
-        .string = &state.git_session_id
-    },
+#define N_ARGUMENTS 6
+static struct init_argument_config_t argument_config[N_ARGUMENTS] = {
     {
         .name = "server_in_fifo_name",
         .argument_type = STRING,
-        .offset = 3,
+        .offset = 1,
         .string = &state.server_in_fifo_name
     },
     {
         .name = "server_out_fifo_name",
         .argument_type = STRING,
-        .offset = 4,
+        .offset = 2,
         .string = &state.server_out_fifo_name
     },
     {
         .name = "git_editor",
         .argument_type = STRING,
-        .offset = 5,
-        .number = &state.git_editor
+        .offset = 3,
+        .string = &state.git_editor
+    },
+    {
+        .name = "git_executable",
+        .argument_type = STRING,
+        .offset = 4,
+        .string = &state.git_executable
     },
     {
         .name = "git_argc",
         .argument_type = NUMBER,
-        .offset = 6,
+        .offset = 5,
         .number = &state.git_argc
     },
     {
         .name = "git_argv",
         .argument_type = STRING_LIST,  // There can only be one argument of type string list and it mus be the last one.
-        .offset = 7,
+        .offset = 6,
         .string_list = &state.git_argv
     }
 };
 
-struct signal_config_t {
-    const int signal;
-    const __sighandler_t handler;
-};
-const static size_t N_SIGNALS = 2;
-const static struct signal_config_t signal_configs[N_SIGNALS] = {
+void sigterm_handler(int signum);
+void sigchld_handler(int signum);
+#define N_SIGNALS 2
+static struct init_signal_config_t signal_config[N_SIGNALS] = {
     {
         .signal = SIGTERM,
         .handler = sigterm_handler
@@ -149,159 +130,103 @@ const static struct signal_config_t signal_configs[N_SIGNALS] = {
     }
 };
 
-struct fifo_config_t {
-        const char *const *name;
-        const int mode;
-        const int permissions;
-        bool *const created_flag;
-        int *const fd;
-        struct pollfd *pollfd; 
-        short pollfd_event_type;
-    };
-const static size_t N_FIFOS = 4;
-const static struct fifo_config_t fifo_configs[N_FIFOS] = {
+#define N_FIFOS 4
+static struct init_fifo_config_t fifo_config[N_FIFOS] = {
     { 
+        .generate_name = false,
         .name = &state.server_in_fifo_name,
-        .mode = O_RDONLY,
+        .mode = O_RDWR | O_NONBLOCK,
         .permissions = 0600,
         .created_flag = &state.server_in_fifo_created,
-        .fd = &state.server_in_fifo_fd,
-        .pollfd = &state.server_fifo_pollfd,
-        .pollfd_event_type = POLLIN
+        .fd = &state.server_in_fifo_fd
     },
     { 
+        .generate_name = false,
         .name = &state.server_out_fifo_name,
-        .mode = O_WRONLY,
+        .mode = O_RDWR | O_NONBLOCK,
         .permissions = 0600,
         .created_flag = &state.server_out_fifo_created,
-        .fd = &state.server_out_fifo_fd,
-        .pollfd = NULL,
-        .pollfd_event_type = 0
+        .fd = &state.server_out_fifo_fd
     },
     { 
+        .generate_name = true,
         .name = &state.editor_simulator_in_fifo_name,
-        .mode = O_RDONLY,
+        .mode = O_RDWR | O_NONBLOCK,
         .permissions = 0600,
         .created_flag = &state.editor_simulator_in_fifo_created,
-        .fd = &state.editor_simulator_in_fifo_fd,
-        .pollfd = &state.editor_simulator_fifo_pollfd,
-        .pollfd_event_type = POLLIN
+        .fd = &state.editor_simulator_in_fifo_fd
     },
     { 
+        .generate_name = true,
         .name = &state.editor_simulator_out_fifo_name,
-        .mode = O_WRONLY,
+        .mode = O_RDWR | O_NONBLOCK,
         .permissions = 0600,
         .created_flag = &state.editor_simulator_out_fifo_created,
-        .fd = &state.editor_simulator_out_fifo_fd,
-        .pollfd = NULL,
-        .pollfd_event_type = 0
+        .fd = &state.editor_simulator_out_fifo_fd
     }
 };
 
-struct pipe_config_t {
-    int *const read_fd;
-    int *const write_fd;
-    struct pollfd *pollfd;
-    short pollfd_event_type;
-};
-const static size_t N_PIPES = 5;
-const static struct pipe_config_t pipe_configs[N_PIPES] = {
+#define N_PIPES 2
+static struct init_pipe_config_t pipe_config[N_PIPES] = {
     {
         .read_fd = &state.sigterm_pipe_read_fd,
-        .write_fd = &state.sigterm_pipe_write_fd,
-        .pollfd = &state.sigterm_pollfd,
-        .pollfd_event_type = POLLIN
+        .write_fd = &state.sigterm_pipe_write_fd
     },
     {
         .read_fd = &state.sigchld_pipe_read_fd,
-        .write_fd = &state.sigchld_pipe_write_fd,
-        .pollfd = &state.sigchld_pollfd,
-        .pollfd_event_type = POLLIN
-    },
-    {
-        .read_fd = NULL,
-        .write_fd = &state.git_stdin_fd,
-        .pollfd = &state.git_stdin_pollfd,
-        .pollfd_event_type = POLLOUT
-    },
-    {
-        .read_fd = &state.git_stdout_fd,
-        .write_fd = NULL,
-        .pollfd = NULL,
-        .pollfd_event_type = 0
-    },
-    {
-        .read_fd = &state.git_stderr_fd,
-        .write_fd = NULL,
-        .pollfd = NULL,
-        .pollfd_event_type = 0
+        .write_fd = &state.sigchld_pipe_write_fd
     }
 };
 
-struct environment_config_t {
-    const char *const key;
-    const char *const *value;
-};
-const static size_t N_VARIABLES = 3;
-const static struct environment_config_t environment_configs[N_VARIABLES] = {
+#define N_VARIABLES 3
+static struct init_environment_config_t environment_config[N_VARIABLES] = {
     {
         .key = "GIT_EDITOR",
         .value = &state.git_editor
     },
     {
-        .key = "GAME_ID",
-        .value = &state.game_id
+        .key = "EDITOR_SIMULATOR_IN_FIFO_NAME",
+        .value = &state.editor_simulator_in_fifo_name
     },
     {
-        .key = "GIT_SESSION_ID",
-        .value = &state.git_session_id
+        .key = "EDITOR_SIMULATOR_OUT_FIFO_NAME",
+        .value = &state.editor_simulator_out_fifo_name
     }
 };
 
-enum pollfd_type_t { 
-    POLLFD_SIGTERM, 
-    POLLFD_SIGCHLD, 
-    POLLFD_GIT_STDIN, 
-    POLLFD_EDITOR_SIMULATOR, 
-    POLLFD_SERVER 
-};
-struct pollfd_config_t {
-    char *name;
-    struct pollfd *pollfd;
-    enum pollfd_type_t pollfd_type;
-    short pollfd_event_type;
-};
-const static size_t N_POLLFDS = 5;
-const static struct pollfd_config_t pollfds[N_POLLFDS] = {
+#define N_POLLFDS 4
+static struct init_pollfd_config_t pollfd_config[N_POLLFDS] = {
     {
         .name = "sigterm",
+        .activated = true,
         .pollfd = &state.sigterm_pollfd,
         .pollfd_type = POLLFD_SIGTERM,
-        .pollfd_event_type = POLLIN
+        .pollfd_event_type = POLLIN,
+        .fd = &state.sigterm_pipe_read_fd
     },
     {
         .name = "sigchld",
+        .activated = false,
         .pollfd = &state.sigchld_pollfd,
         .pollfd_type = POLLFD_SIGCHLD,
-        .pollfd_event_type = POLLIN
-    },
-    {
-        .name = "git_stdin",
-        .pollfd = &state.git_stdin_pollfd,
-        .pollfd_type = POLLFD_GIT_STDIN,
-        .pollfd_event_type = POLLOUT
+        .pollfd_event_type = POLLIN,
+        .fd = &state.sigchld_pipe_read_fd
     },
     {
         .name = "editor_simulator",
+        .activated = false,
         .pollfd = &state.editor_simulator_fifo_pollfd,
         .pollfd_type = POLLFD_EDITOR_SIMULATOR,
-        .pollfd_event_type = POLLIN
+        .pollfd_event_type = POLLIN,
+        .fd = &state.editor_simulator_in_fifo_fd
     },
     {
         .name = "server",
+        .activated = false,
         .pollfd = &state.server_fifo_pollfd,
         .pollfd_type = POLLFD_SERVER,
-        .pollfd_event_type = POLLIN
+        .pollfd_event_type = POLLIN,
+        .fd = &state.server_in_fifo_fd
     }
 };
 
@@ -311,358 +236,278 @@ const static struct pollfd_config_t pollfds[N_POLLFDS] = {
 
 void sigterm_handler(int signum)
 {
-    char *buffer[BUFFER_SIZE];
+    struct communication_packet_t *packet = NULL;
     size_t size = 0;
-    communication_pack_signal(signum, buffer, &size);
-    if (!communication_write(state.sigterm_pipe_write_fd, buffer, size))
+    if (!communication_alloc_signal(signum, &packet, &size))
     {
-        // TODO ?
+        PRINT_ERROR_F("An error (%d) occurred inside the signal handler for SIGTERM during communication_alloc_signal\n", errno);
     }
+    if (!communication_write(state.sigterm_pipe_write_fd, packet, size))
+    {
+        PRINT_ERROR_F("An error (%d) occurred inside the signal handler for SIGTERM during communication_write\n", errno);
+    }
+    free(packet);
 }
 
 void sigchld_handler(int signum)
 {
     int status = 0;
-    pid_t child_pid = 0;
+    pid_t child_pid = waitpid(state.git_pid, &status, 0);
 
-    while ((child_pid = waitpid(-1, &status, WNOHANG)) > 0) 
+    if (child_pid == POSIX_ERROR)
     {
-        if (child_pid == -1)
-        {
-            PRINT_ERROR("waitpid");
-            // TODO ?
-        }
-        if (child_pid == state.git_pid)
-        {
-            char *buffer[BUFFER_SIZE];
-            size_t size = 0;
-            communication_pack_signal(signum, buffer, &size);
-            if (!communication_write(state.sigchld_pipe_write_fd, buffer, size))
-            {
-                // TODO ?
-            }
-        }
+        PRINT_ERRNO_MESSAGE("waitpid");
+        PRINT_ERROR_F("An error (%d) occurred inside the signal handler for SIGCHLD during waitpid\n", errno);
     }
+
+    struct communication_packet_t *packet = NULL;
+    size_t size = 0;
+    state.git_returncode = WEXITSTATUS(status);
+    if (!communication_alloc_signal(signum, &packet, &size))
+    {
+        PRINT_ERROR_F("An error (%d) occurred inside the signal handler for SIGCHLD during communication_alloc_signal\n", errno);
+    }
+    if (!communication_write(state.sigchld_pipe_write_fd, packet, size))
+    {
+        PRINT_ERROR_F("An error (%d) occurred inside the signal handler for SIGCHLD during communication_write\n", errno);
+    }
+    free(packet);
 }
 
 #pragma endregion
 
-# pragma region SETUP
-
-bool read_arguments(int argc, char *argv[])
-{
-    const int MIN_ARGC = 3;
-    const int BASE_10 = 10;
-
-    if (argc < MIN_ARGC)
-    {
-        fprintf(stderr, "Invalid number of arguments: %d\n", argc);
-        return false;
-    }
-
-    for (size_t i = 0; i < N_ARGUMENTS; ++i)
-    {
-        const struct argument_config_t *config = argument_configs + i;
-        
-        switch (config->argument_type)
-        {
-            case STRING:
-                *config->string = argv[config->offset];
-                break;
-            
-                case STRING_LIST:
-                    *config->string_list = argv + config->offset;
-                    break;
-
-            case NUMBER:
-                char *endptr = NULL;
-                size_t result = strtoull(argv[config->offset], &endptr, BASE_10);
-                if ((result || *endptr != argv[config->offset]) && !*endptr)
-                {
-                    break;
-                }
-                
-            default:
-                fprintf(stderr, "Error parsing value \"%s\" into %s\n", argv[config->offset], config->name);
-                return false;
-                break;
-        }
-    }
-
-    return true;
-}
-
-bool register_signals()
-{
-    for (size_t i = 0; i < N_SIGNALS; ++i)
-    {
-        const struct signal_config_t *config = signal_configs + i;
-        if (signal(config->signal, config->handler) == SIG_ERR)
-        {
-            PRINT_ERROR("signal");
-            return false;
-        }
-    }   
-
-    return true;
-}
-
-
-bool create_fifos()
-{
-    for (size_t i = 0; i < N_FIFOS; ++i)
-    {
-        const struct fifo_config_t *config = fifo_configs + i;
-        if (mkfifo(*config->name, config->permissions) == -1)
-        {
-            PRINT_ERROR("mkfifo");
-            return false;
-        }
-        *config->created_flag = true;
-    }
-
-    for (size_t i = 0; i < N_FIFOS; ++i)
-    {
-        const struct fifo_config_t *config = fifo_configs + i;
-        if (*config->fd = open(*config->name, config->mode) == -1)
-        {
-            PRINT_ERROR("open");
-            return false;
-        }
-
-        if (config->pollfd){
-            config->pollfd->fd = *config->fd;
-            config->pollfd->events = config->pollfd_event_type;
-            config->pollfd->revents = 0;
-        }
-    }
-}
-
-bool create_pipes()
-{
-    for (size_t i = 0; i < N_PIPES; ++i)
-    {
-        const struct pipe_config_t *config = pipe_configs + i;
-        int fds[2] = { 0 };
-        if (pipe(fds) == -1)
-        {
-            PRINT_ERROR("pipe");
-            return false;
-        }
-
-        if (config->read_fd)
-        {
-            *config->read_fd = fds[0];
-        }
-        else 
-        {
-            if (close(fds[0]) == -1)
-            {
-                PRINT_ERROR("close");
-                return false;
-            }
-        }
-
-        if (config->write_fd)
-        {
-            *config->write_fd = fds[1];
-        }
-        else
-        {
-            if (close(fds[1]) == -1)
-            {
-                PRINT_ERROR("close");
-                return false;
-            }
-        }
-
-        if (config->pollfd)
-        {
-            config->pollfd->fd = *config->read_fd;
-            config->pollfd->events = config->pollfd_event_type;
-            config->pollfd->revents = 0;
-        }
-    }
-
-    return true;
-}
-
-bool create_ipc()
-{
-    if (!create_fifos())
-    {
-        return false;
-    }    
-
-    if (!create_pipes())
-    {
-        return false;
-    }
-
-    return true;
-}
-
-bool set_environment()
-{
-    for (size_t i = 0; i < N_VARIABLES; ++i)
-    {
-        struct environment_config_t *config = environment_configs + i;
-        if (setenv(config->key, *config->value, true) == -1)
-        {
-            PRINT_ERROR("setenv");
-            return false;
-        }
-    }
-
-    return true;
-}
-
 bool launch_git()
 {
-    pid_t pid = fork();
+    int stdin_pipe[2];
+    int stdout_pipe[2];
+    int stderr_pipe[2];
 
-    if (pid == -1)
+    if (pipe(stdin_pipe) == POSIX_ERROR)
     {
-        PRINT_ERROR("fork");
+        PRINT_ERRNO_MESSAGE("pipe");
         return false;
     }
-    else if (pid == 0)
+    if (pipe(stdout_pipe) == POSIX_ERROR)
+    {
+        PRINT_ERRNO_MESSAGE("pipe");
+        return false;
+    }
+    if (pipe(stderr_pipe) == POSIX_ERROR)
+    {
+        PRINT_ERRNO_MESSAGE("pipe");
+        return false;
+    }
+
+    pid_t pid = fork();
+
+    if (pid == POSIX_ERROR)
+    {
+        PRINT_ERRNO_MESSAGE("fork");
+        return false;
+    }
+
+    if (pid == 0)
     {
         // child process
+
+        if (close(stdin_pipe[PIPE_WRITE_END]) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("close");
+            exit(EXIT_FAILURE);
+        }
+        if (close(stdout_pipe[PIPE_READ_END]) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("close");
+            exit(EXIT_FAILURE);
+        }
+        if (close(stderr_pipe[PIPE_READ_END]) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("close");
+            exit(EXIT_FAILURE);
+        }
+
+        if (dup2(stdin_pipe[PIPE_READ_END], STDIN_FILENO) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("dup2");
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(stdout_pipe[PIPE_WRITE_END], STDOUT_FILENO) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("dup2");
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(stderr_pipe[PIPE_WRITE_END], STDERR_FILENO) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("dup2");
+            exit(EXIT_FAILURE);
+        }
+
+        if (close(stdin_pipe[PIPE_READ_END]) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("close");
+            exit(EXIT_FAILURE);
+        }
+        if (close(stdout_pipe[PIPE_WRITE_END]) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("close");
+            exit(EXIT_FAILURE);
+        }
+        if (close(stderr_pipe[PIPE_WRITE_END]) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("close");
+            exit(EXIT_FAILURE);
+        }
+
         char *arguments[state.git_argc + 2];
-        arguments[0] = "git";
+        arguments[0] = state.git_executable;
         for (size_t i = 0; i < state.git_argc; ++i)
         {
-            strncpy(arguments[i + 1], state.git_argv[i], strlen(state.git_argv[i]));
+            arguments[i + 1] = state.git_argv[i];
         }
-        arguments[state.git_argc + 2] = NULL;
+        arguments[state.git_argc + 1] = NULL;
 
-        if (dup2(state.git_stdin_fd, STDIN_FILENO) == -1)
+        if (execvp(state.git_executable, arguments) == POSIX_ERROR)
         {
-            PRINT_ERROR("dup2");
-            return false;
+            PRINT_ERRNO_MESSAGE("execvp");
+            exit(EXIT_FAILURE);
         }
-        if (close(state.git_stdin_fd) == -1)
-        {
-            PRINT_ERROR("close");
-            return false;
-        }
-
-        if (dup2(state.git_stdout_fd, STDOUT_FILENO) == -1)
-        {
-            PRINT_ERROR("dup2");
-            return false;
-        }
-        if (close(state.git_stdout_fd) == -1)
-        {
-            PRINT_ERROR("close");
-            return false;
-        }
-
-        if (dup2(state.git_stderr_fd, STDERR_FILENO) == -1)
-        {
-            PRINT_ERROR("dup2");
-            return false;
-        }
-        if (close(state.git_stderr_fd) == -1)
-        {
-            PRINT_ERROR("close");
-            return false;
-        }
-
-        execvp("git", arguments);
-
-        PRINT_ERROR("execvp");
-        return false;
     }
     else
     {
         // parent process
+
+        if (close(stdin_pipe[PIPE_READ_END]) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("close");
+            exit(EXIT_FAILURE);
+        }
+        if (close(stdout_pipe[PIPE_WRITE_END]) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("close");
+            exit(EXIT_FAILURE);
+        }
+        if (close(stderr_pipe[PIPE_WRITE_END]) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("close");
+            exit(EXIT_FAILURE);
+        }
+
+        // parent process
+        state.git_stdin_fd = stdin_pipe[PIPE_WRITE_END];
+        state.git_stdout_fd = stdout_pipe[PIPE_READ_END];
+        state.git_stderr_fd = stderr_pipe[PIPE_READ_END];
         state.git_pid = pid;
         state.git_state = RUNNING;
+
+        // terminate interactive git sessions:
+        const char termination_message[] = "q\n";
+        if (write(state.git_stdin_fd, termination_message, strlen(termination_message)) == POSIX_ERROR)
+        {
+            PRINT_ERRNO_MESSAGE("write");
+            return false;
+        }
+
+        turn_on_pollfd(&state.sigchld_pollfd);
+        turn_on_pollfd(&state.editor_simulator_fifo_pollfd);
+
         return true;
     }
+
+    return true;
 }
 
-#pragma endregion
-
-#pragma region MAINLOOP
-
-bool read_git_stdout_stderr(char *git_stdout, char *git_stderr, size_t *git_stdout_size, size_t *git_stderr_size, int *status)
+bool read_git_output(char **git_stdout, char **git_stderr, size_t *stdout_size, size_t *stderr_size, bool no_eof)
 {
-    if (waitpid(state.git_pid, status, 0) == -1)
-    {
-        PRINT_ERROR("waitpid");
-        return false;
-    }
-
-    if (*git_stdout_size = read(state.git_stdout_fd, git_stdout, BUFFER_SIZE - 1) == -1)
-    {
-        PRINT_ERROR("read");
-        return false;
-    }
-    git_stdout[*git_stdout_size] = '\0';
-
-    if (*git_stderr_size = read(state.git_stderr_fd, git_stderr, BUFFER_SIZE - 1) == -1)
-    {
-        PRINT_ERROR("read");
-        return false;
-    }
-    git_stderr[*git_stderr_size] = '\0';
-}
-
-bool transfer_git_output()
-{
-    char git_stdout[BUFFER_SIZE];
-    char git_stderr[BUFFER_SIZE];
-    size_t git_stdout_size = 0;
-    size_t git_stderr_size = 0;
-    int status = 0;
-
-    if (!read_git_stdout_stderr(git_stdout, git_stderr, &git_stdout_size, &git_stderr_size, &status) == -1)
+    if (!communication_read_raw(state.git_stdout_fd, git_stdout, stdout_size, no_eof))
     {
         return false;
     }
-
-    int git_return_code = (WIFEXITED(status))
-        ? WEXITSTATUS(status)
-        : 1;
-
-    char buffer[BUFFER_SIZE];
-    size_t size = 0;
-    communication_pack_git_result(git_return_code, git_stdout_size, git_stderr_size, git_stdout, git_stderr, buffer, &size);
-    if (!communication_write(state.server_out_fifo_fd, buffer, size))
+    if (!communication_read_raw(state.git_stderr_fd, git_stderr, stderr_size, no_eof))
     {
         return false;
     }
     
+    PRINT_DEBUG_F("GIT STDOUT (%d):\n%s\n", *stdout_size, *git_stdout);
+    PRINT_DEBUG_F("GIT STDERR (%d):\n%s\n", *stderr_size, *git_stderr);
+
     return true;
 }
 
-bool handle_sigterm(struct communication_packet_t *packet, size_t size)
+bool transfer_git_output()
 {
+    char *git_stdout = NULL;
+    char *git_stderr = NULL;
+    size_t stdout_size = 0;
+    size_t stderr_size = 0;
+
+    if (!read_git_output(&git_stdout, &git_stderr, &stdout_size, &stderr_size, false))
+    {
+        return false;
+    }
+
+    struct communication_packet_t *packet;
+    size_t packet_size = 0;
+    if (!communication_alloc_git_result(state.git_returncode, stdout_size, stderr_size, git_stdout, git_stderr, &packet, &packet_size))
+    {
+        free(git_stdout);
+        free(git_stderr);
+        free(packet);
+        return false;
+    }
+    if (!communication_write(state.server_out_fifo_fd, packet, packet_size))
+    {
+        free(git_stdout);
+        free(git_stderr);
+        return false;
+    }
+    
+    free(git_stdout);
+    free(git_stderr);
+    free(packet);
+    return true;
+}
+
+bool handle_sigterm(struct communication_packet_t *packet)
+{
+    // deactivate polling on all file descriptors
+    turn_off_pollfd(&state.sigterm_pollfd);
+    turn_off_pollfd(&state.sigchld_pollfd);
+    turn_off_pollfd(&state.editor_simulator_fifo_pollfd);
+    turn_off_pollfd(&state.server_fifo_pollfd);
+
     if (packet->type != COMMUNICATION_SIGNAL)
     {
-        // TODO: error
+        PRINT_ERROR_F("Unexpected packet type: %d\n", packet->type);
         return false;
     }
 
     int signal = packet->packet_content.signal.signal;
     if (signal != SIGTERM)
     {
-        fprintf(stderr, "Received %d instead of %d (SIGTERM)\n", signal, SIGTERM);
+        PRINT_ERROR_F("Unexpected signal: %d\n", signal);
         return false;
     }
-
+    
+    // kill git if it is running
     if (state.git_state != NOT_RUNNING)
     {
-        if (kill(state.git_pid, SIGKILL) == -1)
+        if (kill(state.git_pid, SIGKILL) == POSIX_ERROR)
         {
-            PRINT_ERROR("kill");
+            PRINT_ERRNO_MESSAGE("kill");
             return false;
         }
     }
 
+    // wait for git to terminate and store its returncode
+    int status = 0;
+    if (waitpid(state.git_pid, &status, 0) == POSIX_ERROR)
+    {
+        PRINT_ERRNO_MESSAGE("waitpid");
+        return false;
+    }
+    state.git_returncode = 1;
+    
+    // read git output 
     if (!transfer_git_output())
     {
         return false;
@@ -673,18 +518,22 @@ bool handle_sigterm(struct communication_packet_t *packet, size_t size)
     return true;
 }
 
-bool handle_sigchld(struct communication_packet_t *packet, size_t size)
+bool handle_sigchld(struct communication_packet_t *packet)
 {
+    turn_off_pollfd(&state.sigchld_pollfd);
+    turn_off_pollfd(&state.editor_simulator_fifo_pollfd);
+    turn_off_pollfd(&state.server_fifo_pollfd);
+
     if (packet->type != COMMUNICATION_SIGNAL)
     {
-        // TODO: error
+        PRINT_ERROR_F("Unexpected packet type: %d\n", packet->type);
         return false;
     }
 
     int signal = packet->packet_content.signal.signal;
     if (signal != SIGCHLD)
     {
-        fprintf(stderr, "Received %d instead of %d (SIGCHLD)\n", signal, SIGCHLD);
+        PRINT_ERROR_F("Unexpected signal: %d\n", signal);
         return false;
     }
 
@@ -698,52 +547,66 @@ bool handle_sigchld(struct communication_packet_t *packet, size_t size)
     return true;
 }   
 
-bool handle_git_stdin()
+bool handle_editor_simulator_request(struct communication_packet_t *packet_1)
 {
-    char git_stdout[BUFFER_SIZE];
-    char git_stderr[BUFFER_SIZE];
-    size_t git_stdout_size = 0;
-    size_t git_stderr_size = 0;
-    int status = 0;
+    turn_off_pollfd(&state.editor_simulator_fifo_pollfd);
 
-    if (!read_git_stdout_stderr(git_stdout, git_stderr, &git_stdout_size, &git_stderr_size, &status) == -1)
-    {
-        return false;
-    }
-
-    char buffer[BUFFER_SIZE];
-    size_t size = 0;
-    communication_pack_stdin_request(git_stdout_size, git_stderr_size, git_stdout, git_stderr, buffer, &size);
-    if (!communication_write(state.server_out_fifo_fd, buffer, size))
-    {
-        return false;
-    }
-
-    state.git_state = WAIT_FOR_STDIN;
-
-    return true;
-}
-
-bool handle_editor_simulator_data(struct communication_packet_t *packet, size_t size)
-{
     if (state.git_state != RUNNING)
     {
-        // TODO: error
+        PRINT_ERROR_F("Unexpected git state: %d\n", state.git_state);
         return false;
     }
 
-    if (packet->type != COMMUNICATION_EDITOR_REQUEST)
+    if (packet_1->type != COMMUNICATION_EDITOR_REQUEST_1)
     {
-        // TODO: error
+        PRINT_ERROR_F("Unexpected packet type: %d\n", packet_1->type);
         return false;
     }
 
-    if (!communication_write(state.server_out_fifo_fd, packet, size))
+    memcpy(state.git_editor_filename, packet_1->payload, packet_1->packet_content.editor_request_1.filename_size);
+    state.git_editor_filename[packet_1->packet_content.editor_request_1.filename_size] = '\0';
+
+    char *git_stdout = NULL;
+    char *git_stderr = NULL;
+    size_t stdout_size = 0;
+    size_t stderr_size = 0;
+
+    if (!read_git_output(&git_stdout, &git_stderr, &stdout_size, &stderr_size, true))
     {
+        return false;
+    }
+
+    struct communication_packet_t *packet_2;
+    size_t packet_2_size = 0;
+    if (!communication_alloc_editor_request_2(
+        packet_1->packet_content.editor_request_1.filename_size,
+        packet_1->packet_content.editor_request_1.content_size,
+        stdout_size,
+        stderr_size,
+        (char*)&packet_1->payload[packet_1->packet_content.editor_request_1.filename_offset],
+        (char*)&packet_1->payload[packet_1->packet_content.editor_request_1.content_offset],
+        git_stdout,
+        git_stderr,
+        &packet_2,
+        &packet_2_size
+    ))
+    {
+        free(git_stdout);
+        free(git_stderr);
+        return false;
+    }
+
+    if (!communication_write(state.server_out_fifo_fd, packet_2, packet_2_size))
+    {
+        free(git_stdout);
+        free(git_stderr);
+        free(packet_2);
         return false;
     }
 
     state.git_state = WAIT_FOR_EDITOR_CONTENT;
+
+    turn_on_pollfd(&state.server_fifo_pollfd);
 
     return true;
 }
@@ -755,27 +618,16 @@ bool handle_server_data(struct communication_packet_t *packet, size_t size)
         default:
         case RUNNING:
         case NOT_RUNNING:
-            // TODO: error
+            PRINT_ERROR_F("Unexpected git state: %d\n", state.git_state);
             return false;
             break;
 
-        case WAIT_FOR_STDIN:
-            if (packet->type != COMMUNICATION_STDIN_RESPONSE)
-            {
-                // TODO: error
-                return false;
-            }
-            if (write(state.git_stdin_fd, packet->packet_content.stdin_response.stdin_, packet->packet_content.stdin_response.stdin_size) == -1)
-            {
-                PRINT_ERROR("write");
-                return false;
-            }
-            break;
-
         case WAIT_FOR_EDITOR_CONTENT:
+            turn_off_pollfd(&state.server_fifo_pollfd);
+
             if (packet->type != COMMUNICATION_EDITOR_RESPONSE)
             {
-                // TODO: error
+                PRINT_ERROR_F("Unexpected packet type: %d\n", packet->type);
                 return false;
             }
             if (!communication_write(state.editor_simulator_out_fifo_fd, packet, size))
@@ -791,189 +643,122 @@ bool handle_server_data(struct communication_packet_t *packet, size_t size)
 }
 
 bool mainloop(bool *done)
-{
-    /*
-    Things to wait on:
-    - SIGTERM (this program received a termination request)
-    - SIGCHLD (git has terminated)
-    - stdin of git (git requires input via stdin)
-    - editor_simulator_fifo (git opened the editor simulator)
-    - server_fifo (stdin or editor content from server)
-    */
-     
-    const struct pollfd fds[N_POLLFDS] = {
-        pollfds[0].pollfd,
-        pollfds[1].pollfd,
-        pollfds[2].pollfd,
-        pollfds[3].pollfd,
-        pollfds[4].pollfd
+{    
+    struct pollfd fds[N_POLLFDS] = {
+        *pollfd_config[0].pollfd,
+        *pollfd_config[1].pollfd,
+        *pollfd_config[2].pollfd,
+        *pollfd_config[3].pollfd
     };
-    int poll_result = poll(fds, N_POLLFDS, -1);
+    
+    int poll_result = -1;
+    do {
+        poll_result = poll(fds, N_POLLFDS, -1);
+    } while (poll_result == -1 && errno == EINTR);
 
-    if (poll_result == -1)
+    if (poll_result == POSIX_ERROR)
     {
-        PRINT_ERROR("poll");
+        PRINT_ERRNO_MESSAGE("poll");
         return false;
     }
 
     for (size_t i = 0; i < N_POLLFDS; ++i)
     {
-        if (!pollfds[i].pollfd->revents)
+        if (!fds[i].revents)
         {
             continue;
         }
 
-        if (pollfds[i].pollfd->revents & (POLLHUP | POLLERR | POLLNVAL))
+        if (fds[i].revents & (POLLHUP | POLLERR | POLLNVAL))
         {
-            fprintf(stderr, "An error (%d) occured during polling %s\n", pollfds[i].pollfd->revents, pollfds[i].name);
+            PRINT_ERROR_F("A file descriptor (%d) is in an error state: %x\n", fds[i].fd, fds[i].revents);
             return false;
         }
 
-        if (pollfds[i].pollfd->revents != pollfds[i].pollfd_event_type)
+        if (fds[i].revents != pollfd_config[i].pollfd_event_type)
         {
-            // TODO: error
+            PRINT_ERROR_F("Unexpected poll event: %x\n", fds[i].revents);
         }
 
-        struct communication_packet_t packet;
+        struct communication_packet_t *packet = NULL;
         size_t packet_size = 0;
+
+        if (!communication_read(fds[i].fd, &packet, &packet_size, true))
+        {
+            return false;
+        }
+
         bool success = false;
 
-        if (!communication_read(pollfds[i].pollfd->fd, &packet, &packet_size))
-        {
-            return false;
-        }
-
-        switch (pollfds[i].pollfd_type)
+        switch (pollfd_config[i].pollfd_type)
         {
             case POLLFD_SIGTERM:
-                success = handle_sigterm(&packet, packet_size);
+                success = handle_sigterm(packet);
                 *done = success;
                 break;
 
             case POLLFD_SIGCHLD:
-                success = handle_sigchld(&packet, packet_size);
+                success = handle_sigchld(packet);
                 *done = success;
                 break;
 
-            case POLLFD_GIT_STDIN:
-                success = handle_git_stdin();
-                break;
-
             case POLLFD_EDITOR_SIMULATOR:
-                success = handle_editor_simulator_data(&packet, packet_size);
+                success = handle_editor_simulator_request(packet);
                 break;
 
             case POLLFD_SERVER:
-                success = handle_server_data(&packet, packet_size);
+                success = handle_server_data(packet, packet_size);
                 break;
         }
+
+        free(packet);
 
         if (!success)
         {
             return false;
+        }
+        if (*done)
+        {
+            return true;
         }
     } 
 
     return true;
 }
 
-#pragma endregion
-
-#pragma region CLEANUP
-
-void cleanup_fifos() 
+bool initialize(int argc, char *argv[])
 {
-    for (size_t i = 0; i < N_FIFOS; ++i)
+    if (
+        !init_read_arguments(argc, argv, argument_config, N_ARGUMENTS)
+        || !init_fifos(fifo_config, N_FIFOS)
+        || !init_pipes(pipe_config, N_PIPES)
+        || !init_signals(signal_config, N_SIGNALS)
+        || !init_set_environment(environment_config, N_VARIABLES)
+        || !init_pollfds(pollfd_config, N_POLLFDS)
+    )
     {
-        const struct fifo_config_t *config = fifo_configs + i;
-
-        if (close(*config->fd) == -1)
-        {
-            PRINT_ERROR("close");
-        }
+        return false;
     }
 
-    for (size_t i = 0; i < N_FIFOS; ++i)
-    {
-        const struct fifo_config_t *config = fifo_configs + i;
-
-        if (unlink(*config->name) == -1)
-        {
-            PRINT_ERROR("unlink");
-        }
-
-        config->pollfd->fd = -1;
-        config->pollfd->events = 0;
-        config->pollfd->revents = 0;
-    }
-}
-
-void cleanup_pipes()
-{
-    for (size_t i = 0; i < N_PIPES; ++i)
-    {
-        const struct pipe_config_t *config = pipe_configs + i;
-
-        if (config->write_fd)
-        {
-            if (close(*config->write_fd) == -1)
-            {
-                PRINT_ERROR("close");
-            }
-        }
-
-        if (config->read_fd)
-        {
-            if (close(*config->read_fd) == -1)
-            {
-                PRINT_ERROR("close");
-            }
-        }
-
-        if (config->pollfd)
-        {
-            config->pollfd->fd = -1;
-            config->pollfd->events = 0;
-            config->pollfd->revents = 0;
-        }
-    }
-}
-
-void cleanup_ipc()
-{
-    cleanup_pipes();
-    cleanup_fifos();
-}
-
-void cleanup_signals()
-{
-    for (size_t i = 0; i < N_SIGNALS; ++i)
-    {
-        const struct signal_config_t *config = signal_configs + i;
-        if (signal(config->signal, SIG_DFL) == SIG_ERR)
-        {
-            PRINT_ERROR("signal");
-        }
-    }
+    return true;
 }
 
 void cleanup()
 {
-    cleanup_signals();
-    cleanup_ipc();
+    cleanup_pollfds(pollfd_config, N_POLLFDS);
+    cleanup_signals(signal_config, N_SIGNALS);
+    cleanup_pipes(pipe_config, N_PIPES);
+    cleanup_fifos(fifo_config, N_FIFOS);
 }
-
-#pragma endregion
 
 int main(int argc, char *argv[])
 {
-    if (
-        !read_arguments(argc, argv)
-        || !create_ipc()
-        || !register_signals()
-        || !set_environment()
-        || !launch_git()
-    )
+    if (!initialize(argc, argv))
+    {
+        goto ERROR;
+    }
+
+    if (!launch_git())
     {
         goto ERROR;
     }

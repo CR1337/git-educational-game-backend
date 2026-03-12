@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug orchestrator",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/services/api/git_wrapper/build/orchestrator",
+      "args": [
+        "/tmp/server_in_fifo",
+        "/tmp/server_out_fifo",
+        "../build/editor_simulator",
+        "/usr/bin/git",
+        "1",
+        "status"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/services/api/git_wrapper/test_repo",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}
