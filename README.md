@@ -12,16 +12,16 @@
 bin/build
 ```
 
-4. Test that it works.
-
-```bash
-bin/test
-```
-
-5. Run the docker containers
+4. Run the docker containers
 
 ```bash
 bin/run
+```
+
+5. Test that it works.
+
+```bash
+bin/test
 ```
 
 6. The game is now available at [http://localhost:8080/game](http://localhost:8080/game). The API ist available at [http://localhost:8080/api](http://localhost:8080/api).
