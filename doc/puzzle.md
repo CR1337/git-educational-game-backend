@@ -64,7 +64,8 @@
 |=|pushable box - can be pushed|yes|
 |$|source - must be pushed to destination|yes|
 |!|destination - win when sources stand an a destination|no|
-|?|subgoal - source must have been here before pushed to destination|no|
+|?|subgoal - turns into activates subgoal when source is pushed over it|no|
+|&|activated subgoal - must be activated in order to win|no|
 |<|left conveyer - moves pushables to the left|no|
 |>|right conveyer - moves pushables to the right|no|
 |^|up conveyer - moves pushables up|no|
