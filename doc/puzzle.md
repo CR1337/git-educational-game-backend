@@ -64,6 +64,7 @@
 |=|pushable box - can be pushed|yes|
 |$|source - must be pushed to destination|yes|
 |!|destination - win when sources stand an a destination|no|
+|?|subgoal - source must have been here before pushed to destination|no|
 |<|left conveyer - moves pushables to the left|no|
 |>|right conveyer - moves pushables to the right|no|
 |^|up conveyer - moves pushables up|no|
@@ -81,7 +82,7 @@
 |f|fire - melts neighboring ice, burns neighboring trash, vanishes|no| 
 
 
-|4-8|bomb - burns the neighbors after 4-8 ticks after activation, activated by burning or energizing|yes|
+|4-8|sterilizer - burns the neighbors after 4-8 ticks after activation, activated by burning or energizing|yes|
 |h,j,k,l|power plant - drops battery in corresponding direction when heated for 3 ticks|
 
 ### Example Map
