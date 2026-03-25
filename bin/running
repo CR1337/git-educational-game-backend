@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Get container IDs for this compose project
+ids=$(docker compose ps -q)
+
+# If no containers exist, it's not running
+if [ -z "$ids" ]; then
+  exit 1
+fi
+
+# Check if any container is actually running
+for id in $ids; do
+  state=$(docker inspect -f '{{.State.Running}}' "$id" 2>/dev/null)
+  if [ "$state" = "true" ]; then
+    exit 0
+  fi
+done
+
+exit 1

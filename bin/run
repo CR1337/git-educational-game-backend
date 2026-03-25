@@ -1,0 +1,29 @@
+#!/bin/bash
+
+bin/running
+if [ $? -ne 1 ]; then
+  echo "Already running."
+  exit
+fi
+
+
+INTERACTIVE=0
+
+# Parse flags
+while getopts ":i" opt; do
+  case $opt in
+    i)
+      INTERACTIVE=1
+      ;;
+    *)
+      echo "Usage: $0 [-i]"
+      exit 1
+      ;;
+  esac
+done
+
+if [ "$INTERACTIVE" -eq 1 ]; then
+docker compose up
+else
+docker compose up -d
+fi

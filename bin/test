@@ -1,0 +1,8 @@
+#!/bin/bash
+
+bin/running
+if [ $? -eq 0 ]; then
+  pytest tests -v
+else
+  echo "Not running."
+fi
