@@ -1,8 +1,8 @@
-# git Communication
+# Git Communication
 
-## Non-Editor git command
+## Local
 
-### Local
+### Non-Editor Command
 
 ```mermaid
 sequenceDiagram
@@ -10,30 +10,15 @@ sequenceDiagram
     actor User
     participant git
 
-    User ->>+ git: argv, stdin
-    git -->>- User: stdout, stderr, status
-```
-### Server
+    activate User
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Client
-    participant Server
-    participant git
-    
-    Client ->>+ Server: POST /git (argv, stdin)
+    User ->>+ git: argv
+    git -->>- User: stdout, stderr, returncode
 
-        Server ->>+ git: argv, stdin
-
-        git -->>- Server: stdout, stderr, status
-
-    Server -->>- Client: 200 OK (stdout, stderr, status)
+    deactivate User
 ```
 
-## Editor git command
-
-### Local
+### Editor Command
 
 ```mermaid
 sequenceDiagram
@@ -42,195 +27,186 @@ sequenceDiagram
     participant git
     participant Editor
 
-    User ->>+ git: argv, stdin
+    activate User
+
+    User ->>+ git: argv
         git ->>+ Editor: filename
-            Editor ->>+ User:
-            User -->>- Editor:
-        Editor -->>- git: status
-    git -->>- User: stdout, stderr, status
+            Editor ->>+ User: editor windows opens
+            User -->>- Editor: new content
+        Editor -->>- git: returncode
+    git -->>- User: stdout, stderr, returncode
+
+    deactivate User
 ```
 
-### Server
+## Client-Server
+
+### Non-Editor Command
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Client
-    participant Server
-    participant git
-    participant EditorSimulator
 
-    Client ->>+ Server: POST /git (argv, stdin)
-        Server ->> git: argv, stdin
-            activate git
-            git ->> EditorSimulator: filename
-        activate EditorSimulator
-        EditorSimulator ->> Server: POST /editor-session/{session_id}/init (file_content)
-    Server -->>- Client: 200 OK (session_id, file_content)
-
-    Client ->>+ Server: POST /editor-session/{session_id} (edited_content)
-        Server ->> EditorSimulator: edited_content
-            EditorSimulator -->> git: 
-            deactivate EditorSimulator
-
-
-        git -->> Server: stdout, stderr, status
-        deactivate git
-    Server -->>- Client: 200 OK (stdout, stderr, status)
-```
-
-## git Orchestrator State Diagram
-
-```mermaid
-stateDiagram-v2
-    direction LR
-
-    [*] --> running
-
-    state orchstrator_running {
-        running --> wait_for_stdin: GIT_STDIN_READY
-        running --> wait_for_editor_content: GIT_OPENED_EDITOR
-
-        wait_for_stdin --> running: STDIN_FROM_SERVER
-
-        wait_for_editor_content --> running: CONTENT_FROM_SERVER
-    }
+    activate Client
     
-    running --> [*]: SIGCHLD
-
-    orchstrator_running --> [*]: SIGTERM
-```
-
-## Sequence Diagram
-
-```mermaid
-sequenceDiagram
-    autonumber
-
-    participant Client
-    participant Redis
-    participant Env
-
-    create participant Server1
-    Client ->> Server1: game_id, argv
-        activate Server1
+    create participant Server
+    Client ->>+ Server: POST /git-command (argv)
 
         create participant Worker
-        Server1 -) Worker: game_id, argv, cwd
-            activate Worker
+        Server ->>+ Worker: argv
 
-            Worker -) Redis: [game_id:worker_id] = worker_id
+            create participant git
+            Worker ->>+ git: argv
 
-            create participant GitWrapper
-            Worker -) GitWrapper: argv, cwd, editor_path, git_path, worker_fifo_path
-                activate GitWrapper
+            git -->>- Worker: stdout, stderr, status
 
-                Note over GitWrapper,Env: Set Environment variables
-                GitWrapper -) Env: GIT_EDITOR=editor_path
-                GitWrapper -) Env: EDITOR_FIFO=editor_fifo_path
+        Worker -->>- Server: stdout, stderr, status
 
-                create participant git
-                GitWrapper -) git: argv
-                    activate git
+    Server -->>- Client: 200 OK (stdout, stderr, status)
 
-                Note over GitWrapper,git: cancel potential interactive session via stdin
-                GitWrapper -) git: "q\n"
-            
-    opt If git tries to open an editor
+    deactivate Client
+```
 
-                    Note over git,Env: git reads the executable path to use for the editor
-                    git ->> Env: GIT_EDITOR
-                    Env -->> git: editor_path
+### Editor Command
 
-                    create participant File
-                    git -) File: create
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
 
-                    Note over git,File: git created the file and next passes it to the editor
+    activate Client
 
-                    create participant EditorSimulator
-                    git ->> EditorSimulator: filename
-                        activate EditorSimulator
+    create participant Server1
+    Client ->> Server1: POST /git-command (argv)
+    activate Server1
 
-                        EditorSimulator ->> Env: EDITOR_FIFO
-                        Env -->> EditorSimulator: editor_fifo_path
+        create participant Worker
+        Server1 ->> Worker: argv
+        activate Worker
 
-                        EditorSimulator ->> File: read
-                        File -->> EditorSimulator: content
+            create participant git
+            Worker ->> git: argv
+            activate git
 
-                Note over EditorSimulator,GitWrapper: via editor_fifo
-                EditorSimulator -) GitWrapper: filename, content
+                create participant Editor
+                git ->> Editor: filename
+                activate Editor
 
-            git -) GitWrapper: stdout, stderr
+            Editor --) Worker: filename, content
 
-            Note over GitWrapper,Worker: via server_fifo
-            GitWrapper -) Worker: filename, content, stdout, stderr
+        Worker --) Server1: filename, content
 
-            Worker -) Redis: [game_id:editor_request] = filename, content, stdout, stderr
-
-        Note over Server1,Redis: via Redis as message broker
-        Server1 ->> Redis: game_id:editor_request
-        Redis -->> Server1: filename, content, stdout, stderr
-
-    Server1 -->> Client: filename, content, stdout, stderr
+    Server1 -->> Client: 200 OK (filename, content)
     deactivate Server1
-    destroy Server1
-    Server1 -x Server1: exit
 
     create participant Server2
-    Client ->> Server2: game_id, new_content, abort
-        activate Server2
+    Client ->> Server2: POST /editor-response (new_content, abort)
+    activate Server2
 
-        Server2 ->> Redis: game_id:worker_id
-        Redis -->> Server2: worker_id
+        Server2 --) Worker: new_content, abort
 
-        Server2 -) Redis: [game_id:editor_response] = new_content, abort
+            Worker --) Editor: new_content, abort
 
-            Note over Worker,Redis: via Redis as message broker
-            Worker ->> Redis: game_id:editor_response
-            Redis -->> Worker: new_content, abort
+                Editor -->> git: returncode
+                deactivate Editor
 
-            Note over Worker,GitWrapper: via server_fifo
-            Worker -) GitWrapper: new_content, abort
-
-                Note over GitWrapper,EditorSimulator: via editor_fifo
-                GitWrapper -) EditorSimulator: new_content, abort
-
-                    opt not abort
-
-                        EditorSimulator -) File: write(new_content)
-
-                    end
-
-                EditorSimulator -->> git: 
-                deactivate EditorSimulator
-                destroy EditorSimulator
-                EditorSimulator -x EditorSimulator: exit
-
-            destroy File
-            git -x File: remove
-
-end
-
-            git -->> GitWrapper: returncode, stdout, stderr
+            git -->> Worker: stdout, stderr, status
             deactivate git
-            destroy git
-            git -x git: exit
 
-        Note over GitWrapper,Worker: via server_fifo
-        GitWrapper -) Worker: returncode, stdout, stderr
-        GitWrapper -->> Worker: 
-        deactivate GitWrapper
-        destroy GitWrapper
-        GitWrapper -x GitWrapper: exit
+        Worker -->> Server2: stdout, stderr, status
+        deactivate Worker
 
-    Note over Server2,Client: If git never opened an editor, this interaction would happen with Server1
-    Worker -->> Server2: returncode, stdout, stderr
-    deactivate Worker
-    destroy Worker
-    Worker -x Worker: exit
-
-    Server2 -->> Client: returncode, stdout, stderr
+    Server2 -->> Client: 200 OK (stdout, stderr, status)
     deactivate Server2
-    destroy Server2
-    Server2 -x Server2: exit
+
+    deactivate Client
+```
+
+### Non-Editor Command with Orchestrator
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Orchestrator
+
+    activate Client
+    activate Orchestrator
+    
+    create participant Server
+    Client ->> Server: POST /git-command (argv)
+    activate Server
+
+        Server --) Orchestrator: argv
+
+            create participant git
+            Orchestrator ->> git: argv
+            activate git
+
+            git -->> Orchestrator: stdout, stderr, status
+            deactivate git
+
+        Orchestrator --) Server: stdout, stderr, status
+
+    Server -->> Client: 200 OK (stdout, stderr, status)
+    deactivate Server
+
+    deactivate Orchestrator
+    deactivate Client
+```
+
+### Editor Command with Orchestrator
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Orchestrator
+
+    activate Client
+    activate Orchestrator
+
+    create participant Server1
+    Client ->> Server1: POST /git-command (argv)
+    activate Server1
+
+        Server1 --) Orchestrator: argv
+
+            create participant git
+            Orchestrator ->> git: argv
+            activate git
+
+                create participant Editor
+                git ->> Editor: filename
+                activate Editor
+
+            Editor --) Orchestrator: filename, content
+
+        Orchestrator --) Server1: filename, content
+
+    Server1 -->> Client: 200 OK (filename, content)
+    deactivate Server1
+
+    create participant Server2
+    Client ->> Server2: POST /editor-response (new_content, abort)
+    activate Server2
+
+        Server2 --) Orchestrator: new_content, abort
+
+            Orchestrator --) Editor: new_content, abort
+
+                Editor -->> git: returncode
+                deactivate Editor
+
+            git -->> Orchestrator: stdout, stderr, status
+            deactivate git
+
+        Orchestrator --) Server2: stdout, stderr, status
+
+    Server2 -->> Client: 200 OK (stdout, stderr, status)
+    deactivate Server2
+
+    deactivate Orchestrator
+    deactivate Client
 ```

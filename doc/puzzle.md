@@ -82,7 +82,7 @@
 |f|fire - melts neighboring ice, burns neighboring trash, vanishes|no| 
 
 
-|4-8|sterilizer - burns the neighbors after 4-8 ticks after activation, activated by burning or energizing|yes|
+|4-8|heater - burns the neighbors after 4-8 ticks after activation, activated by burning or energizing|yes|
 |h,j,k,l|power plant - drops battery in corresponding direction when heated for 3 ticks|
 
 ### Example Map
