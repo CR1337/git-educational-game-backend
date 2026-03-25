@@ -1,6 +1,6 @@
 # git-educational-game-backend
 
-## Setup
+## Setup (Linux only)
 
 1. [Install docker](https://docs.docker.com/engine/install/).
 
