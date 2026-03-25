@@ -19,15 +19,6 @@ async def get_root() -> models.Message:
     return models.Message(message="Hello from the API!")
 
 
-@router.post(
-    "/reset",
-    response_model=None,
-    status_code=status.HTTP_205_RESET_CONTENT
-)
-async def post_reset() -> None:
-    ...  # TODO
-
-
 # -- games --------------------------------------------------------------------
 
 
