@@ -1,0 +1,26 @@
+/
+    game_data/
+        levels/
+            1/
+                map.txt
+                meta.json
+                repo/
+                    file_1.bot
+                    file_2.bot
+                    file_3.bot
+            2/
+            3/
+        games/
+            game_id_1/
+                meta.json
+                levels/
+                    1/
+                        meta.json
+                        repo/
+                            file_1.bot
+                            file_2.bot
+                            file_3.bot
+                    2/
+                    3/
+            game_id_2/
+            game_id_3/

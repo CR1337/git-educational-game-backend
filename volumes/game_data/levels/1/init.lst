@@ -1,0 +1,4 @@
+create bot0.bot
+write bot0.bot bot0.bot
+git add .
+git commit -m "first commit"

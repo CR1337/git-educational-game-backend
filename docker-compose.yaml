@@ -3,27 +3,24 @@ services:
     build:
       context: .
       dockerfile: ./services/api/Dockerfile
-    user:
-      - "1000:1000"
-    ports:
-      - 8000:8000
+    user: "1000:1000"
+    # ports:
+    #   - 8000:8000
     volumes:
       - ./volumes/game_data:/game_data
-    depends_on:
-      - redis
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
 
-  redis:
+  nginx:
     build:
       context: .
-      dockerfile: ./services/redis/Dockerfile
-    ports:
-      - 6379:6379
-    volumes:
-      - ./volumes/redis_data:/data
+      dockerfile: ./services/nginx/Dockerfile
+    ports: 
+      - 8080:8080
+    volumes: 
+      - ./volumes/game:/usr/share/nginx/html
+    depends_on:
+      - api
+
 
 volumes:
   game_data:
-  redis_data:
+  game:

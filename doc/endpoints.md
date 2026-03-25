@@ -1,47 +1,46 @@
 # Backend endpoints
 
-
 ## Level endpoints
 
-### GET `/levels`
+These endpoints static level data.
 
-### GET `/levels/{level-id}`
+### `GET /levels`
 
+Returns a list of all level ids
+
+### `GET /levels/{level-id}`
+
+Returns a level object with level-id
+
+### Example of a level object
+
+```json
+{
+    "name": "Level 1",
+    "files": [
+        "filename1",
+        "filename2",
+        "filename3"
+    ]
+}
+```
 
 ## Game endpoints
 
-### GET `/games`
+These endpoints return dynamic level data and game data.
 
-### GET `/games/{game-id}`
+### `GET /games`
 
-### DELETE `/games/{game-id}`
+Returns a list of all game ids.
 
-### POST `/games/new`
+### `POST /games/new`
 
-### POST `/games/{game-id}/run-tests/{level-id}`
+Creates a new game and returns the game object
 
-### GET `/games/{game-id}/progress`
+### `GET /games/{game-id}`
 
+Returns a game object with game-id
 
-## Filesystem endpoints
+### `DELETE /games/{game-id}`
 
-### GET `/games/{game-id}/files/{filepath}`
-
-### POST `/games/{game-id}/files/{filepath}`
-
-### PUT `/games/{game-id}/files/{filepath}`
-
-### DELETE `/games/{game-id}/files/{filepath}`
-
-### GET `/games/{game-id}/current-working-directory`
-
-### PUT `/games/{game-id}/current-working-directory`
-
-
-## Git endpoints
-
-### POST `/games/git`
-
-### POST `/games/git/editor-session/new`
-
-### POST `/games/git/editor-session/{editor-session-id}`
+Deletes a game from the server.
