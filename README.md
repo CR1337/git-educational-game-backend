@@ -30,6 +30,8 @@ bin/test
 
 7. The game is now available at [http://localhost:8080/game](http://localhost:8080/game). The API ist available at [http://localhost:8080/api](http://localhost:8080/api).
 
+8. You can set `DEBUG_MODE` to `0` and rebuild to disable debug features.
+
 ## Advanced
 
 You can stop the docker containers with 
