@@ -8,25 +8,27 @@
 
 _(The game is still in development. Until then a placeholder `index.html` is used.)_
 
-3. Build the docker images.
+3. Make sure `DEBUG_MODE` in `.env` is set to `1`. 
+
+4. Build the docker images.
 
 ```bash
 bin/build
 ```
 
-4. Run the docker containers
+5. Run the docker containers
 
 ```bash
 bin/run
 ```
 
-5. Test that it works.
+6. Test that it works.
 
 ```bash
 bin/test
 ```
 
-6. The game is now available at [http://localhost:8080/game](http://localhost:8080/game). The API ist available at [http://localhost:8080/api](http://localhost:8080/api).
+7. The game is now available at [http://localhost:8080/game](http://localhost:8080/game). The API ist available at [http://localhost:8080/api](http://localhost:8080/api).
 
 ## Advanced
 

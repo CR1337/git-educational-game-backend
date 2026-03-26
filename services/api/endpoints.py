@@ -1,5 +1,6 @@
 from fastapi import APIRouter, status, Response
 import models
+import debug
 import controllers
 from typing import List, Union
 
@@ -27,6 +28,7 @@ async def get_root() -> models.Message:
     response_model=List[models.IdType],
     status_code=status.HTTP_200_OK
 )
+@debug.debug_only_endpoint
 async def get_games() -> List[models.IdType]:
     return controllers.GameController.get_games()
 
@@ -62,6 +64,7 @@ async def get_game(
     response_model=None,
     status_code=status.HTTP_204_NO_CONTENT
 )
+@debug.debug_only_endpoint
 async def delete_game(
     game_id: models.IdType
 ) -> Union[None, Response]:
