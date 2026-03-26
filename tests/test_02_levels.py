@@ -1,6 +1,14 @@
 from tests.conftest import make_request, ModelAssertions, assert_dict_value, assert_dict_type
 
 
+def test_get_level_graph(setup_and_teardown, game_id):
+    status, data = make_request("get", f"/games/{game_id}/level-graph")
+
+    assert status == 200
+    assert isinstance(data, dict)
+    ModelAssertions.assert_level_graph(data)
+
+
 def test_get_levels(setup_and_teardown, game_id):
     status, data = make_request("get", f"/games/{game_id}/levels")
 

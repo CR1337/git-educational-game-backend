@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pydantic import BaseModel
 from pathlib import Path
-from typing import List, Tuple, Annotated, Literal, Optional
+from typing import List, Tuple, Annotated, Literal, Dict
 from pydantic import StringConstraints
 
 
@@ -82,7 +82,6 @@ class LevelNode(BaseModel):
     type_: Literal["LevelNode"] = "LevelNode"
     id: IdType
     name: str
-    successor: Optional[IdType]
     started: bool
     solved: bool
     
@@ -96,6 +95,12 @@ class Level(BaseModel):
     intro: str
     outro: str
     level_node: LevelNode
+
+
+class LevelGraph(BaseModel):
+    type_: Literal["LevelGraph"] = "LevelGraph"
+    start_levels: List[LevelNode]
+    edges: Dict[IdType, LevelNode]
 
 
 class Player(BaseModel):

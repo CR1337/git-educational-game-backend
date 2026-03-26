@@ -76,6 +76,23 @@ async def delete_game(
 
 
 @router.get(
+    "/games/{game_id}/level-graph",
+    response_model=models.LevelGraph,
+    status_code=status.HTTP_200_OK
+)
+async def get_level_graph(
+    game_id: models.IdType
+) -> Union[models.LevelGraph, Response]:
+    try:
+        return controllers.LevelController.get_level_graph(
+            game_id
+        )
+
+    except FileNotFoundError:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+
+@router.get(
     "/games/{game_id}/levels",
     response_model=List[models.LevelNode],
     status_code=status.HTTP_200_OK

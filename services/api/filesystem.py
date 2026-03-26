@@ -16,6 +16,7 @@ class Filesystem:
 
     GAMES_PATH: Path = Path(GAME_DATA_PATH, "games")
     LEVELS_PATH: Path = Path(GAME_DATA_PATH, "levels")
+    LEVEL_GRAPH_PATH: Path = Path(GAME_DATA_PATH, "level_graph.json")
 
     GIT_EDITOR_PATH: Path = (
         Path("/", "app", "git_orchestrator", "git_editor")

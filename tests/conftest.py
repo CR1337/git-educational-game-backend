@@ -170,7 +170,6 @@ class ModelAssertions:
         assert_dict_value(data, "type_", "LevelNode", str)
         assert_dict_type(data, "id", str)
         assert_dict_type(data, "name", str)
-        assert_dict_type(data, "successor", str, can_be_none=True)
         assert_dict_type(data, "started", bool)
         assert_dict_type(data, "solved", bool)
 
@@ -191,6 +190,20 @@ class ModelAssertions:
         assert_dict_type(data, "outro", str)
         assert_dict_type(data, "level_node", dict)
         cls.assert_level_node(data["level_node"])
+
+    @classmethod
+    def assert_level_graph(cls, data: Dict[str, Any]) -> None:
+        assert_dict_value(data, "type_", "LevelGraph", str)
+        assert_dict_type(data, "start_levels", list)
+        assert len(data["start_levels"]) > 0
+        for start_level in data["start_levels"]:
+            assert isinstance(start_level, dict)
+            cls.assert_level_node(start_level)
+        assert_dict_type(data, "edges", dict)
+        assert all(isinstance(key, str) for key in data["edges"].keys())
+        for edge in data["edges"].values():
+            assert isinstance(edge, dict)
+            cls.assert_level_node(edge) 
 
     @classmethod
     def assert_player(cls, data: Dict[str, Any]) -> None:

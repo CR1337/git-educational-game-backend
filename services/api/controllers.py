@@ -71,6 +71,27 @@ class LevelController:
         "started": False,
         "solved": False
     }
+
+    @classmethod
+    def get_level_graph(cls, game_id: models.IdType) -> models.LevelGraph:
+        level_nodes = {node.id: node for node in cls.get_levels(game_id)}
+
+        with open(Filesystem.LEVEL_GRAPH_PATH, 'r', encoding="utf-8") as f:
+            graph_id_data = json.load(f)
+
+        start_levels = [level_nodes[level_id] for level_id in graph_id_data["start_levels"]]
+        edges = {
+            source_id: [level_nodes[destination_id] for destination_id in destination_ids]
+            for source_id, destination_ids in graph_id_data["edges"].items()
+        }
+
+        level_graph = models.LevelGraph(
+            start_levels=start_levels,
+            edges=edges  # type: ignore
+        )
+
+        return level_graph
+        
     
     @classmethod
     def get_levels(cls, game_id: models.IdType) -> List[models.LevelNode]:
@@ -91,7 +112,6 @@ class LevelController:
             level_node = models.LevelNode(
                 id=level_id,
                 name=level_metadata["name"],
-                successor=level_metadata["successor"],
                 started=game_level_metadata["started"],
                 solved=game_level_metadata["solved"]
             )
@@ -113,7 +133,6 @@ class LevelController:
         level_node = models.LevelNode(
             id=level_id,
             name=level_metadata["name"],
-            successor=level_metadata["successor"],
             started=game_level_metadata["started"],
             solved=game_level_metadata["solved"]
         )
