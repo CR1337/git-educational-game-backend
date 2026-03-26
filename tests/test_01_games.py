@@ -3,10 +3,7 @@ from tests.conftest import make_request, ModelAssertions, assert_dict_value
 
 def test_new_game(setup_and_teardown):
     player_name = "player"
-    payload = {
-        "type_": "Player",
-        "name": player_name
-    }
+    payload = {"type_": "Player", "name": player_name}
     status, data = make_request("post", "/games/new", payload)
 
     assert status == 201
@@ -22,7 +19,7 @@ def test_get_games(setup_and_teardown, game_id):
     assert isinstance(data, list)
     assert len(data) == 1
     assert all(isinstance(item, str) for item in data)
-    assert data[0] == game_id   # type: ignore
+    assert data[0] == game_id  # type: ignore
 
 
 def test_get_game(setup_and_teardown, game_id):

@@ -3,6 +3,7 @@ import socket
 import struct
 from typing import Dict, Optional, Any
 
+
 class GitCommunication:
 
     ORCHESTRATOR_ADDRESS: str = "127.0.0.1"
@@ -34,12 +35,20 @@ class GitCommunication:
                 data += chunk
 
             return json.loads(data.decode(GitCommunication.ENCODING))
-        
-        except (socket.timeout, ConnectionRefusedError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+
+        except (
+            socket.timeout,
+            ConnectionRefusedError,
+            OSError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ):
             return None
 
     @classmethod
-    def write_json_to_socket(cls, socket_: socket.socket, object_: Dict[str, Any]) -> bool:
+    def write_json_to_socket(
+        cls, socket_: socket.socket, object_: Dict[str, Any]
+    ) -> bool:
         data = json.dumps(object_).encode(GitCommunication.ENCODING)
         length = len(data)
         header = struct.pack(cls.HEADER_FORMAT, length)

@@ -38,14 +38,18 @@ class GitSession:
     _git_stderr: str
 
     @staticmethod
-    def find_by_api_socket_fd(sessions: Iterable[GitSession], api_socket_fd: int) -> GitSession:
+    def find_by_api_socket_fd(
+        sessions: Iterable[GitSession], api_socket_fd: int
+    ) -> GitSession:
         for session in sessions:
             if session.api_connection.fileno() == api_socket_fd:
                 return session
         raise ValueError(f"No GitSession found for api_socket_fd {api_socket_fd}")
 
     @staticmethod
-    def find_by_editor_socket_fd(sessions: Iterable[GitSession], editor_socket_fd: int) -> GitSession:
+    def find_by_editor_socket_fd(
+        sessions: Iterable[GitSession], editor_socket_fd: int
+    ) -> GitSession:
         for session in sessions:
             if session.editor_connection is None:
                 continue
@@ -68,22 +72,18 @@ class GitSession:
         self._state = GitSessionState.CLOSED
 
     def run(
-        self, 
-        cwd: Path, 
-        git_editor: Path, 
-        git_executable: Path, 
-        git_argv: List[str]
+        self, cwd: Path, git_editor: Path, git_executable: Path, git_argv: List[str]
     ) -> None:
         self._git_process = subprocess.Popen(
-            args = [git_executable.as_posix()] + git_argv,
+            args=[git_executable.as_posix()] + git_argv,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env={
                 GitCommunication.ENVIRONMENT_GIT_EDITOR: git_editor.as_posix(),
-                GitCommunication.ENVIRONMENT_GIT_SESSION_ID: self._session_id
+                GitCommunication.ENVIRONMENT_GIT_SESSION_ID: self._session_id,
             },
-            cwd=cwd
+            cwd=cwd,
         )
 
         git_stdin = self._git_process.stdin
@@ -97,7 +97,7 @@ class GitSession:
         if self._state in (
             GitSessionState.GIT_TERMINATED,
             GitSessionState.CLOSED,
-            GitSessionState.KILLED
+            GitSessionState.KILLED,
         ):
             return
 
@@ -107,9 +107,7 @@ class GitSession:
         assert err
 
         ready_streams, _, _ = select.select(
-            [out, err], 
-            [], [], 
-            GitOrchestrator.POLL_WAIT_TIME
+            [out, err], [], [], GitOrchestrator.POLL_WAIT_TIME
         )
         for stream in ready_streams:
             if stream == out:
@@ -133,31 +131,31 @@ class GitSession:
     @property
     def state(self) -> GitSessionState:
         return self._state
-    
+
     @state.setter
     def state(self, value: GitSessionState) -> None:
         self._state = value
-    
+
     @property
     def returncode(self) -> int:
         return self._git_returncode
-    
+
     @property
     def git_stdout(self) -> str:
         return self._git_stdout
-    
+
     @property
     def git_stderr(self) -> str:
         return self._git_stderr
-    
+
     @property
     def session_id(self) -> str:
         return self._session_id
-    
+
     @property
     def api_connection(self) -> socket.socket:
         return self._api_connection
-    
+
     @api_connection.setter
     def api_connection(self, value: socket.socket) -> None:
         self._api_connection = value
@@ -165,11 +163,10 @@ class GitSession:
     @property
     def editor_connection(self) -> Optional[socket.socket]:
         return self._editor_connection
-    
+
     @editor_connection.setter
     def editor_connection(self, value: socket.socket) -> None:
         self._editor_connection = value
-    
 
 
 class PollEventType(str, enum.Enum):
@@ -184,7 +181,7 @@ class GitOrchestrator:
 
     MAX_CONNECTIONS: int = 2048
     POLL_WAIT_TIME: float = 0.05  # s
-    
+
     _anonymous_connections: Dict[int, socket.socket]
     _api_connections: Dict[int, socket.socket]
     _editor_connections: Dict[int, socket.socket]
@@ -203,7 +200,9 @@ class GitOrchestrator:
         self._git_sessions = {}
 
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server_socket.bind((GitCommunication.ORCHESTRATOR_ADDRESS, GitCommunication.ORCHESTRATOR_PORT))
+        self._server_socket.bind(
+            (GitCommunication.ORCHESTRATOR_ADDRESS, GitCommunication.ORCHESTRATOR_PORT)
+        )
         self._server_socket.listen(self.MAX_CONNECTIONS)
 
         self._server_poll = select.poll()
@@ -235,37 +234,45 @@ class GitOrchestrator:
         for connection in self._editor_connections.values():
             socket_fd = connection.fileno()
             self._editor_client_poll.unregister(socket_fd)
-            connection.close() 
+            connection.close()
 
     def _mainloop(self):
         for git_session in self._git_sessions.values():
             git_session.update()
 
-        events: Sequence[Tuple[Optional[int], Optional[GitSession], int, PollEventType]] = [
-            (fd, None, event, PollEventType.SERVER) 
-            for fd, event in self._server_poll.poll(self.POLL_WAIT_TIME)
-        ] + [
-            (fd, None, event, PollEventType.ANONYMOUS) 
-            for fd, event in self._anonymous_client_poll.poll(self.POLL_WAIT_TIME)
-        ] +  [
-            (fd, None, event, PollEventType.API) 
-            for fd, event in self._api_client_poll.poll(self.POLL_WAIT_TIME)
-        ] + [
-            (fd, None, event, PollEventType.EDITOR) 
-            for fd, event in self._editor_client_poll.poll(self.POLL_WAIT_TIME)
-        ] + [
-            (None, git_session, select.POLLIN, PollEventType.GIT)
-            for git_session in self._git_sessions.values()
-            if git_session.state == GitSessionState.GIT_TERMINATED
-        ]
+        events: Sequence[
+            Tuple[Optional[int], Optional[GitSession], int, PollEventType]
+        ] = (
+            [
+                (fd, None, event, PollEventType.SERVER)
+                for fd, event in self._server_poll.poll(self.POLL_WAIT_TIME)
+            ]
+            + [
+                (fd, None, event, PollEventType.ANONYMOUS)
+                for fd, event in self._anonymous_client_poll.poll(self.POLL_WAIT_TIME)
+            ]
+            + [
+                (fd, None, event, PollEventType.API)
+                for fd, event in self._api_client_poll.poll(self.POLL_WAIT_TIME)
+            ]
+            + [
+                (fd, None, event, PollEventType.EDITOR)
+                for fd, event in self._editor_client_poll.poll(self.POLL_WAIT_TIME)
+            ]
+            + [
+                (None, git_session, select.POLLIN, PollEventType.GIT)
+                for git_session in self._git_sessions.values()
+                if git_session.state == GitSessionState.GIT_TERMINATED
+            ]
+        )
 
         for fd, git_session, event, event_type in events:
 
-            match event_type:   
+            match event_type:
                 case PollEventType.SERVER:
                     socket_ = self._server_socket
                     self._handle_server_event(socket_, event)
-                
+
                 case PollEventType.ANONYMOUS:
                     assert fd is not None
                     socket_ = self._anonymous_connections[fd]
@@ -300,7 +307,9 @@ class GitOrchestrator:
                 case errno.EMFILE:
                     pass  # too many open sockets, ignore, client must handle
                 case errno.EADDRINUSE:
-                    raise SystemError(f"Address {GitCommunication.ORCHESTRATOR_ADDRESS}:{GitCommunication.ORCHESTRATOR_PORT} aleady in use.")
+                    raise SystemError(
+                        f"Address {GitCommunication.ORCHESTRATOR_ADDRESS}:{GitCommunication.ORCHESTRATOR_PORT} aleady in use."
+                    )
                 case errno.EACCES:
                     raise SystemError("Permission denied.")
                 case errno.ENFILE:
@@ -348,7 +357,7 @@ class GitOrchestrator:
                     case _:
                         self._cleanup_anonymous_connection(socket_fd)
                         return
-        
+
         elif event & select.POLLHUP:
             self._cleanup_anonymous_connection(socket_fd)
             return
@@ -367,7 +376,7 @@ class GitOrchestrator:
                 case _:
                     self._cleanup_anonymous_connection(socket_fd)
                     return
-                    
+
         else:
             raise ValueError("Unexpected event on anonymous socket.")
 
@@ -382,7 +391,7 @@ class GitOrchestrator:
             else:
                 git_session_id = from_api_packet["git_session_id"]
                 from_api_data = from_api_packet["data"]
-                
+
                 match from_api_packet["type"]:
                     case "git_command":
                         git_session = GitSession(git_session_id, socket_)
@@ -391,11 +400,10 @@ class GitOrchestrator:
                             Path(from_api_data["cwd"]),
                             Path(from_api_data["git_editor"]),
                             Path(from_api_data["git_executable"]),
-                            from_api_data["git_argv"]
+                            from_api_data["git_argv"],
                         )
                         assert git_session.state == GitSessionState.GIT_RUNNING
                         self._git_sessions[git_session_id] = git_session
-
 
                     case "editor_response":
                         git_session = self._git_sessions[git_session_id]
@@ -408,15 +416,16 @@ class GitOrchestrator:
                         to_editor_packet = {
                             "type": "editor_response",
                             "git_session_id": git_session_id,
-                            "data": {
-                                "new_content": new_content,
-                                "abort": abort
-                            }
+                            "data": {"new_content": new_content, "abort": abort},
                         }
 
                         assert git_session.editor_connection is not None
-                        if not GitCommunication.write_json_to_socket(git_session.editor_connection, to_editor_packet):
-                            self._cleanup_editor_connection(git_session.editor_connection.fileno())
+                        if not GitCommunication.write_json_to_socket(
+                            git_session.editor_connection, to_editor_packet
+                        ):
+                            self._cleanup_editor_connection(
+                                git_session.editor_connection.fileno()
+                            )
                             return
                         else:
                             git_session.state = GitSessionState.GIT_RUNNING
@@ -473,12 +482,16 @@ class GitOrchestrator:
                                 "filename": filename,
                                 "content": content,
                                 "stdout": git_session.git_stdout,
-                                "stderr": git_session.git_stderr
-                            }
+                                "stderr": git_session.git_stderr,
+                            },
                         }
 
-                        if not GitCommunication.write_json_to_socket(git_session.api_connection, to_api_packet):
-                            self._cleanup_api_connection(git_session.api_connection.fileno())
+                        if not GitCommunication.write_json_to_socket(
+                            git_session.api_connection, to_api_packet
+                        ):
+                            self._cleanup_api_connection(
+                                git_session.api_connection.fileno()
+                            )
                             return
                         else:
                             git_session.state = GitSessionState.EDITOR_REQUEST
@@ -507,7 +520,7 @@ class GitOrchestrator:
 
         else:
             raise ValueError("Unexpected event on editor socket.")
-      
+
     def _handle_git_event(self, git_session: GitSession, event: int) -> None:
         assert event & select.POLLIN
 
@@ -520,11 +533,13 @@ class GitOrchestrator:
             "data": {
                 "returncode": git_session.returncode,
                 "stdout": git_session.git_stdout,
-                "stderr": git_session.git_stderr
-            }
+                "stderr": git_session.git_stderr,
+            },
         }
 
-        if not GitCommunication.write_json_to_socket(git_session.api_connection, to_api_packet):
+        if not GitCommunication.write_json_to_socket(
+            git_session.api_connection, to_api_packet
+        ):
             self._cleanup_api_connection(git_session.api_connection.fileno())
             return
         else:
@@ -561,7 +576,6 @@ class GitOrchestrator:
             self._editor_connections.pop(editor_connection_fd)
 
         self._git_sessions.pop(git_session.session_id)
-
 
     def run(self) -> None:
         while not self._termination_requested:

@@ -53,7 +53,9 @@ class Map(BaseModel):
     width: int
     height: int
     content: str
-    patches: List[Tuple[int, int, Annotated[str, StringConstraints(min_length=1, max_length=1)]]]
+    patches: List[
+        Tuple[int, int, Annotated[str, StringConstraints(min_length=1, max_length=1)]]
+    ]
 
     @classmethod
     def parse(cls, string: str, id_: IdType) -> Map:
@@ -62,20 +64,15 @@ class Map(BaseModel):
         header = lines[0].strip()
         width, height = [int(s) for s in header.split()]
 
-        content = "\n".join(lines[1:height + 1])
+        content = "\n".join(lines[1 : height + 1])
         patches = [
             (int(x), int(y), tile)
-            for line in lines[height+1:] if len(line.strip()) > 0
+            for line in lines[height + 1 :]
+            if len(line.strip()) > 0
             for x, y, tile in [line.strip().split()]
         ]
 
-        return cls(
-            id=id_,
-            width=width,
-            height=height,
-            content=content,
-            patches=patches
-        )
+        return cls(id=id_, width=width, height=height, content=content, patches=patches)
 
 
 class LevelNode(BaseModel):
@@ -84,7 +81,7 @@ class LevelNode(BaseModel):
     name: str
     started: bool
     solved: bool
-    
+
 
 class Level(BaseModel):
     type_: Literal["Level"] = "Level"
@@ -112,5 +109,3 @@ class Game(BaseModel):
     type_: Literal["Game"] = "Game"
     id: IdType
     player: Player
-    
-

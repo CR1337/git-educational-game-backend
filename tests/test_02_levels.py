@@ -1,4 +1,9 @@
-from tests.conftest import make_request, ModelAssertions, assert_dict_value, assert_dict_type
+from tests.conftest import (
+    make_request,
+    ModelAssertions,
+    assert_dict_value,
+    assert_dict_type,
+)
 
 
 def test_get_level_graph(setup_and_teardown, game_id):

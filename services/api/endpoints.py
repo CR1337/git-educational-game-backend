@@ -11,11 +11,7 @@ router: APIRouter = APIRouter()
 # -- root ---------------------------------------------------------------------
 
 
-@router.get(
-    "/",
-    response_model=models.Message,
-    status_code=status.HTTP_200_OK
-)
+@router.get("/", response_model=models.Message, status_code=status.HTTP_200_OK)
 async def get_root() -> models.Message:
     return models.Message(message="Hello from the API!")
 
@@ -24,9 +20,7 @@ async def get_root() -> models.Message:
 
 
 @router.get(
-    "/games",
-    response_model=List[models.IdType],
-    status_code=status.HTTP_200_OK
+    "/games", response_model=List[models.IdType], status_code=status.HTTP_200_OK
 )
 @debug.debug_only_endpoint
 async def get_games() -> List[models.IdType]:
@@ -34,43 +28,31 @@ async def get_games() -> List[models.IdType]:
 
 
 @router.post(
-    "/games/new",
-    response_model=models.Game,
-    status_code=status.HTTP_201_CREATED
+    "/games/new", response_model=models.Game, status_code=status.HTTP_201_CREATED
 )
-async def post_new_game(
-    player: models.Player
-) -> Union[models.Game, Response]:
+async def post_new_game(player: models.Player) -> Union[models.Game, Response]:
     return controllers.GameController.new_game(player)
 
 
 @router.get(
-    "/games/{game_id}",
-    response_model=models.Game,
-    status_code=status.HTTP_200_OK
+    "/games/{game_id}", response_model=models.Game, status_code=status.HTTP_200_OK
 )
-async def get_game(
-    game_id: models.IdType
-) -> Union[models.Game, Response]:
+async def get_game(game_id: models.IdType) -> Union[models.Game, Response]:
     try:
         return controllers.GameController.get_game(game_id)
-    
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
 
 
 @router.delete(
-    "/games/{game_id}",
-    response_model=None,
-    status_code=status.HTTP_204_NO_CONTENT
+    "/games/{game_id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT
 )
 @debug.debug_only_endpoint
-async def delete_game(
-    game_id: models.IdType
-) -> Union[None, Response]:
+async def delete_game(game_id: models.IdType) -> Union[None, Response]:
     try:
         controllers.GameController.delete_game(game_id)
-    
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -81,15 +63,11 @@ async def delete_game(
 @router.get(
     "/games/{game_id}/level-graph",
     response_model=models.LevelGraph,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
-async def get_level_graph(
-    game_id: models.IdType
-) -> Union[models.LevelGraph, Response]:
+async def get_level_graph(game_id: models.IdType) -> Union[models.LevelGraph, Response]:
     try:
-        return controllers.LevelController.get_level_graph(
-            game_id
-        )
+        return controllers.LevelController.get_level_graph(game_id)
 
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
@@ -98,16 +76,12 @@ async def get_level_graph(
 @router.get(
     "/games/{game_id}/levels",
     response_model=List[models.LevelNode],
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
-async def get_levels(
-    game_id: models.IdType
-) -> Union[List[models.LevelNode], Response]:
+async def get_levels(game_id: models.IdType) -> Union[List[models.LevelNode], Response]:
     try:
-        return controllers.LevelController.get_levels(
-            game_id
-        )
-    
+        return controllers.LevelController.get_levels(game_id)
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -115,18 +89,14 @@ async def get_levels(
 @router.get(
     "/games/{game_id}/levels/{level_id}",
     response_model=models.Level,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def get_level(
-    game_id: models.IdType, 
-    level_id: models.IdType
+    game_id: models.IdType, level_id: models.IdType
 ) -> Union[models.Level, Response]:
     try:
-        return controllers.LevelController.get_level(
-            game_id,
-            level_id
-        )
-    
+        return controllers.LevelController.get_level(game_id, level_id)
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -134,75 +104,62 @@ async def get_level(
 @router.put(
     "/games/{game_id}/levels/{level_id}/reset",
     response_model=models.Level,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def put_level_reset(
-    game_id: models.IdType, 
-    level_id: models.IdType   
+    game_id: models.IdType, level_id: models.IdType
 ) -> Union[models.Level, Response]:
     try:
-        return controllers.LevelController.reset_level(
-            game_id,
-            level_id
-        )
-    
+        return controllers.LevelController.reset_level(game_id, level_id)
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
-    
+
 
 @router.put(
     "/games/{game_id}/levels/{level_id}/started",
     response_model=None,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def put_level_started(
-    game_id: models.IdType, 
-    level_id: models.IdType   
+    game_id: models.IdType, level_id: models.IdType
 ) -> Union[None, Response]:
     try:
-        controllers.LevelController.set_started(
-            game_id,
-            level_id
-        )
-    
+        controllers.LevelController.set_started(game_id, level_id)
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
-    
+
 
 @router.put(
     "/games/{game_id}/levels/{level_id}/solved",
     response_model=None,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def put_level_solved(
-    game_id: models.IdType, 
-    level_id: models.IdType   
+    game_id: models.IdType, level_id: models.IdType
 ) -> Union[None, Response]:
     try:
-        controllers.LevelController.set_solved(
-            game_id,
-            level_id
-        )
-    
+        controllers.LevelController.set_solved(game_id, level_id)
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
 
 
-# -- files ----------------------------------------------------------------------
+# -- files --------------------------------------------------------------------
 
 
 @router.get(
     "/games/{game_id}/levels/{level_id}/files",
     response_model=List[str],
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def get_files(
-    game_id: models.IdType,
-    level_id: models.IdType
+    game_id: models.IdType, level_id: models.IdType
 ) -> Union[List[str], Response]:
     try:
         return controllers.FileController.get_files(game_id, level_id)
-    
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -210,16 +167,14 @@ async def get_files(
 @router.get(
     "/games/{game_id}/levels/{level_id}/files/{filename}",
     response_model=models.File,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def get_file(
-    game_id: models.IdType,
-    level_id: models.IdType,
-    filename: str
+    game_id: models.IdType, level_id: models.IdType, filename: str
 ) -> Union[models.File, Response]:
     try:
         return controllers.FileController.get_file(game_id, level_id, filename)
-    
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -227,17 +182,14 @@ async def get_file(
 @router.put(
     "/games/{game_id}/levels/{level_id}/files/{filename}",
     response_model=None,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
 )
 async def put_file(
-    game_id: models.IdType,
-    level_id: models.IdType,
-    filename: str,
-    file: models.File
+    game_id: models.IdType, level_id: models.IdType, filename: str, file: models.File
 ) -> Union[None, Response]:
     try:
         controllers.FileController.put_file(game_id, level_id, filename, file)
-    
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -248,54 +200,47 @@ async def put_file(
 @router.post(
     "/games/{game_id}/levels/{level_id}/git-command",
     response_model=Union[models.GitResult, models.EditorRequest],
-    status_code=status.HTTP_202_ACCEPTED
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def post_git_command(
-    game_id: models.IdType,
-    level_id: models.IdType,
-    git_command: models.GitCommand
+    game_id: models.IdType, level_id: models.IdType, git_command: models.GitCommand
 ) -> Union[models.GitResult, models.EditorRequest, Response]:
     try:
         result = controllers.GitController.run_git_command(
-            game_id,
-            level_id,
-            git_command
+            game_id, level_id, git_command
         )
-    
+
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
-    
+
     except PermissionError:
         return Response(status_code=status.HTTP_403_FORBIDDEN)
-    
+
     if result is None:
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     return result
 
 
 @router.post(
     "/games/{game_id}/levels/{level_id}/editor-response",
     response_model=models.GitResult,
-    status_code=status.HTTP_202_ACCEPTED
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def post_editor_response(
     game_id: models.IdType,
     level_id: models.IdType,
-    editor_response: models.EditorResponse
+    editor_response: models.EditorResponse,
 ) -> Union[models.GitResult, Response]:
     try:
         result = controllers.GitController.handle_editor_response(
-            game_id,
-            level_id,
-            editor_response
+            game_id, level_id, editor_response
         )
 
     except FileNotFoundError:
         return Response(status_code=status.HTTP_404_NOT_FOUND)
-    
+
     if result is None:
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     return result
-    

@@ -16,14 +16,7 @@ if debug.in_debug_mode():
     app = FastAPI(lifespan=lifespan)
 
 else:
-    app = FastAPI(
-        lifespan=lifespan,
-        docs_url=None, 
-        redoc_url=None, 
-        openapi_url=None
-    )
+    app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 
 app.include_router(router)
-
-

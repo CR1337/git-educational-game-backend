@@ -14,8 +14,7 @@ GAMES_BACKUP_PATH: Path = Path("games_backup")
 GAMES_PATH: Path = Path("volumes", "game_data", "games")
 
 UUID1_PATTERN: re.Pattern = re.compile(
-    r'^[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$',
-    re.IGNORECASE
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
 )
 
 
@@ -34,20 +33,18 @@ def _restore_games():
 
 
 def make_request(
-    method: str, 
-    url: str, 
-    payload: Optional[Union[Dict[str, Any], List[Any]]]=None
+    method: str, url: str, payload: Optional[Union[Dict[str, Any], List[Any]]] = None
 ) -> Tuple[int, Optional[Dict[str, Any]]]:
     func = {
         "get": requests.get,
         "post": requests.post,
         "put": requests.put,
-        "delete": requests.delete
+        "delete": requests.delete,
     }[method]
 
     url = f"http://{HOST}:{PORT}/api{url}"
     response = func(url=url, json=payload)
-    
+
     status = response.status_code
     try:
         data = response.json()
@@ -62,12 +59,12 @@ def _is_uuid1(string: str) -> bool:
 
 
 def assert_dict_value(
-    dictionary: Dict[str, Any], 
-    key: str, 
-    expected_value: Any, 
+    dictionary: Dict[str, Any],
+    key: str,
+    expected_value: Any,
     type_: Type,
     *,
-    can_be_none: bool = False
+    can_be_none: bool = False,
 ) -> None:
     assert key in dictionary
     if dictionary[key] is None and can_be_none:
@@ -77,10 +74,7 @@ def assert_dict_value(
 
 
 def assert_dict_uuid1(
-    dictionary: Dict[str, Any], 
-    key: str,
-    *,
-    can_be_none: bool = False
+    dictionary: Dict[str, Any], key: str, *, can_be_none: bool = False
 ) -> None:
     assert key in dictionary
     if dictionary[key] is None and can_be_none:
@@ -90,11 +84,7 @@ def assert_dict_uuid1(
 
 
 def assert_dict_type(
-    dictionary: Dict[str, Any], 
-    key: str, 
-    type_: Type,
-    *,
-    can_be_none: bool = False
+    dictionary: Dict[str, Any], key: str, type_: Type, *, can_be_none: bool = False
 ) -> None:
     assert key in dictionary
     if dictionary[key] is None and can_be_none:
@@ -203,7 +193,7 @@ class ModelAssertions:
         assert all(isinstance(key, str) for key in data["edges"].keys())
         for edge in data["edges"].values():
             assert isinstance(edge, dict)
-            cls.assert_level_node(edge) 
+            cls.assert_level_node(edge)
 
     @classmethod
     def assert_player(cls, data: Dict[str, Any]) -> None:
@@ -227,10 +217,7 @@ def setup_and_teardown():
 
 @pytest.fixture
 def game_id() -> str:
-    payload = {
-        "type_": "Player",
-        "name": "player"
-    }
+    payload = {"type_": "Player", "name": "player"}
     _, data = make_request("post", "/games/new", payload)
     assert data
     game_id = data["id"]
