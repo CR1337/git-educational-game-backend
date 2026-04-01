@@ -20,7 +20,11 @@ class GameController:
 
     @classmethod
     def get_games(cls) -> List[models.IdType]:
-        return os.listdir(Filesystem.GAMES_PATH)
+        return [
+            name
+            for name in os.listdir(Filesystem.GAMES_PATH)
+            if not name.startswith(".")
+        ]
 
     @classmethod
     def new_game(cls, player: models.Player) -> models.Game:
