@@ -1,3 +1,14 @@
 #!/bin/bash
 
+output=$(hostnamectl)
+
+if echo "$output" | grep -q "Operating System.*Server"; then
+    echo "Server environment detected. Using docker-compose-server.yaml..."
+    cp docker-compose-server.yaml docker-compose.yaml
+else
+    # Otherwise, copy docker-compose-local.yaml
+    echo "Local environment detected. Using docker-compose-local.yaml..."
+    cp docker-compose-local.yaml docker-compose.yaml
+fi
+
 docker compose build
