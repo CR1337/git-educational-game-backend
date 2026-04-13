@@ -351,11 +351,16 @@ class GitController:
     @classmethod
     def run_git_command_directly(
         cls, game_id: models.IdType, level_id: models.IdType, argv: List[str]
-    ) -> bool:
+    ) -> models.GitResult:
         cwd = Filesystem.get_game_level_repo_path(game_id, level_id)
-        git_process = subprocess.Popen(args=["git"] + argv, cwd=cwd)
+        git_process = subprocess.Popen(
+            args=["git"] + argv, cwd=cwd, env={"GIT_PAGER": ""}
+        )
         returncode = git_process.wait()
-        return returncode == 0
+        stdout, stderr = [x.decode() for x in git_process.communicate()]
+        return models.GitResult(
+            id="0", returncode=returncode, stdout=stdout, stderr=stderr
+        )
 
     @classmethod
     def handle_editor_response(
@@ -366,3 +371,69 @@ class GitController:
     ) -> Union[models.GitResult, None]:
         interface = cls._get_git_interface(game_id, level_id, editor_response.id)
         return interface.send_editor_response(editor_response)
+
+    @classmethod
+    def get_git_graph(
+        cls, game_id: models.IdType, level_id: models.IdType
+    ) -> Union[models.GitGraph, None]:
+        nodes: List[str] = []
+        children: Dict[str, List[str]] = {}
+        parents: Dict[str, List[str]] = {}
+        commit_messages: Dict[str, str] = {}
+
+        argv = ["log", "--pretty=format:%H %s %P"]
+        result = cls.run_git_command_directly(game_id, level_id, argv)
+        if result.returncode != 0:
+            return None
+        for line in result.stdout.splitlines():
+            hash_, message, *parent_hashes = line.strip().split()
+            nodes.append(hash_)
+            parents[hash_] = []
+            for parent in parent_hashes:
+                if parent not in children:
+                    children[parent] = []
+                children[parent].append(hash_)
+                parents[hash_].append(parent)
+            commit_messages[hash_] = message
+
+        head: str = ""
+
+        argv = ["rev-parse", "HEAD"]
+        result = cls.run_git_command_directly(game_id, level_id, argv)
+        if result.returncode != 0:
+            return None
+        head = result.stdout.strip()
+
+        tags: Dict[str, str] = {}
+
+        argv = ["show-ref", "--tags", "-d"]
+        result = cls.run_git_command_directly(game_id, level_id, argv)
+        if result.returncode != 0:
+            return None
+        for line in result.stdout.splitlines():
+            hash_, raw_tag = line.strip().split()
+            tag = raw_tag.split("/")[-1]
+            tags[hash_] = tag
+
+        branch_names: Dict[str, str] = {}
+
+        argv = ["show-ref", "--heads"]
+        result = cls.run_git_command_directly(game_id, level_id, argv)
+        if result.returncode != 0:
+            return None
+        for line in result.stdout.splitlines():
+            hash_, raw_branch_name = line.strip().split()
+            branch_name = raw_branch_name.split("/")[-1]
+            branch_names[hash_] = branch_name
+
+        graph = models.GitGraph(
+            nodes=nodes,
+            children=children,
+            parents=parents,
+            head=head,
+            tags=tags,
+            commit_messages=commit_messages,
+            branch_names=branch_names,
+        )
+
+        return graph

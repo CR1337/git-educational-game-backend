@@ -244,3 +244,23 @@ async def post_editor_response(
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     return result
+
+
+@router.get(
+    "/games/{game_id}/levels/{level_id}/git-graph",
+    response_model=models.GitGraph,
+    status_code=status.HTTP_200_OK,
+)
+async def get_git_graph(
+    game_id: models.IdType, level_id: models.IdType
+) -> Union[models.GitGraph, Response]:
+    try:
+        result = controllers.GitController.get_git_graph(game_id, level_id)
+
+    except FileNotFoundError:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+    if result is None:
+        return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return result

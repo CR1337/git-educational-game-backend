@@ -55,7 +55,17 @@ def make_request(
 
 
 def _is_uuid1(string: str) -> bool:
+    if not isinstance(string, str):
+        return False
     return bool(UUID1_PATTERN.fullmatch(string))
+
+
+def _is_sha(string: str) -> bool:
+    if not isinstance(string, str):
+        return False
+    if len(string) not in (40, 64):
+        return False
+    return all(c.lower() in "012345679abcdef" for c in string)
 
 
 def assert_dict_value(
@@ -206,6 +216,39 @@ class ModelAssertions:
         assert_dict_uuid1(data, "id")
         assert_dict_type(data, "player", dict)
         cls.assert_player(data["player"])
+
+    @classmethod
+    def assert_git_graph(cls, data: Dict[str, Any]) -> None:
+        assert_dict_value(data, "type_", "GitGraph", str)
+        assert_dict_type(data, "nodes", list)
+        assert all(_is_sha(s) for s in data["nodes"])
+        assert_dict_type(data, "children", dict)
+        assert all(_is_sha(k) for k in data["children"].keys())
+        assert all(isinstance(v, list) for v in data["children"].values())
+        for v in data["children"].values():
+            assert all(_is_sha(h) for h in v)
+        assert_dict_type(data, "parents", dict)
+        assert all(_is_sha(k) for k in data["parents"].keys())
+        assert all(isinstance(v, list) for v in data["parents"].values())
+        for v in data["parents"].values():
+            assert all(_is_sha(h) for h in v)
+        assert_dict_type(data, "head", str)
+        assert _is_sha(data["head"])
+        assert_dict_type(data, "tags", dict)
+        assert all(_is_sha(k) for k in data["tags"].keys())
+        assert all(isinstance(v, list) for v in data["tags"].values())
+        for v in data["tags"].values():
+            assert all(isinstance(h, str) for h in v)
+        assert_dict_type(data, "commit_messages", dict)
+        assert all(_is_sha(k) for k in data["commit_messages"].keys())
+        assert all(isinstance(v, list) for v in data["commit_messages"].values())
+        for v in data["commit_messages"].values():
+            assert all(isinstance(h, str) for h in v)
+        assert_dict_type(data, "branch_names", dict)
+        assert all(_is_sha(k) for k in data["branch_names"].keys())
+        assert all(isinstance(v, list) for v in data["branch_names"].values())
+        for v in data["branch_names"].values():
+            assert all(isinstance(h, str) for h in v)
 
 
 @pytest.fixture

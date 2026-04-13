@@ -59,3 +59,13 @@ def test_post_editor_response(setup_and_teardown, game_id, level_id, filename):
     assert isinstance(data, dict)
     ModelAssertions.assert_git_result(data)
     assert_dict_value(data, "returncode", 0, int)
+
+
+def test_get_git_graph(setup_and_teardown, game_id, level_id):
+    status, data = make_request("get", f"/games/{game_id}/levels/{level_id}/git-graph")
+
+    assert status == 200
+    assert isinstance(data, dict)
+    ModelAssertions.assert_git_graph(data)
+
+    assert len(data["nodes"]) > 0

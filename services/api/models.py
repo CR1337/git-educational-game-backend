@@ -109,3 +109,14 @@ class Game(BaseModel):
     type_: Literal["Game"] = "Game"
     id: IdType
     player: Player
+
+
+class GitGraph(BaseModel):
+    type_: Literal["GitGraph"] = "GitGraph"
+    nodes: List[str]
+    children: Dict[str, List[str]]
+    parents: Dict[str, List[str]]
+    head: str
+    tags: Dict[str, str]
+    commit_messages: Dict[str, str]
+    branch_names: Dict[str, str]

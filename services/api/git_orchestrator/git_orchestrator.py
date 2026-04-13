@@ -82,6 +82,7 @@ class GitSession:
             env={
                 GitCommunication.ENVIRONMENT_GIT_EDITOR: git_editor.as_posix(),
                 GitCommunication.ENVIRONMENT_GIT_SESSION_ID: self._session_id,
+                "GIT_PAGER": "",
             },
             cwd=cwd,
         )
