@@ -15,7 +15,7 @@ class Filesystem:
     )
 
     GAMES_PATH: Path = Path(GAME_DATA_PATH, "games")
-    LEVELS_PATH: Path = Path(GAME_DATA_PATH, "levels")
+    LEVELSETS_PATH: Path = Path(GAME_DATA_PATH, "levels")
     LEVEL_GRAPH_PATH: Path = Path(GAME_DATA_PATH, "level_graph.json")
 
     GIT_EDITOR_PATH: Path = (
@@ -31,67 +31,133 @@ class Filesystem:
     @classmethod
     def get_path(cls, components: List[str | Path], *, must_exist: bool = True) -> Path:
         path = Path(*components)
+        print(f"{path=}")
         if not path.exists() and must_exist:
             raise FileNotFoundError()
         return path
 
     @classmethod
-    def get_level_path(
-        cls, level_id: models.IdType, *, must_exist: bool = True
+    def get_levels_path(
+        cls, levelset_id: models.IdType, *, must_exist: bool = True
     ) -> Path:
-        return cls.get_path([cls.LEVELS_PATH, level_id], must_exist=must_exist)
+        return cls.get_path([cls.LEVELSETS_PATH, levelset_id], must_exist=must_exist)
+
+    @classmethod
+    def get_level_graph_path(
+        cls, levelset_id: models.IdType, *, must_exist: bool = True
+    ) -> Path:
+        return cls.get_path(
+            [
+                cls.get_levels_path(levelset_id, must_exist=must_exist),
+                "level_graph.json",
+            ],
+            must_exist=must_exist,
+        )
+
+    @classmethod
+    def get_level_path(
+        cls,
+        levelset_id: models.IdType,
+        level_id: models.IdType,
+        *,
+        must_exist: bool = True,
+    ) -> Path:
+        return cls.get_path(
+            [cls.get_levels_path(levelset_id, must_exist=must_exist), level_id],
+            must_exist=must_exist,
+        )
 
     @classmethod
     def get_level_map_path(
-        cls, level_id: models.IdType, *, must_exist: bool = True
+        cls,
+        levelset_id: models.IdType,
+        level_id: models.IdType,
+        *,
+        must_exist: bool = True,
     ) -> Path:
         return cls.get_path(
-            [cls.get_level_path(level_id, must_exist=must_exist), "map.txt"],
+            [
+                cls.get_level_path(levelset_id, level_id, must_exist=must_exist),
+                "map.txt",
+            ],
             must_exist=must_exist,
         )
 
     @classmethod
     def get_level_text_path(
-        cls, level_id: models.IdType, *, must_exist: bool = True
+        cls,
+        levelset_id: models.IdType,
+        level_id: models.IdType,
+        *,
+        must_exist: bool = True,
     ) -> Path:
         return cls.get_path(
-            [cls.get_level_path(level_id, must_exist=must_exist), "text.json"],
+            [
+                cls.get_level_path(levelset_id, level_id, must_exist=must_exist),
+                "text.json",
+            ],
             must_exist=must_exist,
         )
 
     @classmethod
     def get_level_meta_path(
-        cls, level_id: models.IdType, *, must_exist: bool = True
+        cls,
+        levelset_id: models.IdType,
+        level_id: models.IdType,
+        *,
+        must_exist: bool = True,
     ) -> Path:
         return cls.get_path(
-            [cls.get_level_path(level_id, must_exist=must_exist), "meta.json"],
+            [
+                cls.get_level_path(levelset_id, level_id, must_exist=must_exist),
+                "meta.json",
+            ],
             must_exist=must_exist,
         )
 
     @classmethod
     def get_level_init_path(
-        cls, level_id: models.IdType, *, must_exist: bool = True
+        cls,
+        levelset_id: models.IdType,
+        level_id: models.IdType,
+        *,
+        must_exist: bool = True,
     ) -> Path:
         return cls.get_path(
-            [cls.get_level_path(level_id, must_exist=must_exist), "init.lst"],
+            [
+                cls.get_level_path(levelset_id, level_id, must_exist=must_exist),
+                "init.lst",
+            ],
             must_exist=must_exist,
         )
 
     @classmethod
     def get_level_files_path(
-        cls, level_id: models.IdType, *, must_exist: bool = True
+        cls,
+        levelset_id: models.IdType,
+        level_id: models.IdType,
+        *,
+        must_exist: bool = True,
     ) -> Path:
         return cls.get_path(
-            [cls.get_level_path(level_id, must_exist=must_exist), "files"],
+            [cls.get_level_path(levelset_id, level_id, must_exist=must_exist), "files"],
             must_exist=must_exist,
         )
 
     @classmethod
     def get_level_file_path(
-        cls, level_id: models.IdType, filename: str, *, must_exist: bool = True
+        cls,
+        levelset_id: models.IdType,
+        level_id: models.IdType,
+        filename: str,
+        *,
+        must_exist: bool = True,
     ) -> Path:
         return cls.get_path(
-            [cls.get_level_files_path(level_id, must_exist=must_exist), filename],
+            [
+                cls.get_level_files_path(levelset_id, level_id, must_exist=must_exist),
+                filename,
+            ],
             must_exist=must_exist,
         )
 
@@ -154,7 +220,7 @@ class Filesystem:
         level_id: models.IdType,
         filename: str,
         *,
-        must_exist: bool = True
+        must_exist: bool = True,
     ) -> Path:
         return cls.get_path(
             [

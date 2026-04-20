@@ -201,9 +201,11 @@ class ModelAssertions:
             cls.assert_level_node(start_level)
         assert_dict_type(data, "edges", dict)
         assert all(isinstance(key, str) for key in data["edges"].keys())
-        for edge in data["edges"].values():
-            assert isinstance(edge, dict)
-            cls.assert_level_node(edge)
+        for dsts in data["edges"].values():
+            assert isinstance(dsts, list)
+            assert all(isinstance(dst, dict) for dst in dsts)
+            for dst in dsts:
+                cls.assert_level_node(dst)
 
     @classmethod
     def assert_player(cls, data: Dict[str, Any]) -> None:
@@ -216,6 +218,8 @@ class ModelAssertions:
         assert_dict_uuid1(data, "id")
         assert_dict_type(data, "player", dict)
         cls.assert_player(data["player"])
+        assert_dict_type(data, "levelset", dict)
+        cls.assert_levelset(data["levelset"])
 
     @classmethod
     def assert_git_graph(cls, data: Dict[str, Any]) -> None:
@@ -250,6 +254,19 @@ class ModelAssertions:
         for v in data["branch_names"].values():
             assert all(isinstance(h, str) for h in v)
 
+    @classmethod
+    def assert_levelset(cls, data: Dict[str, Any]) -> None:
+        assert_dict_value(data, "type_", "Levelset", str)
+        assert_dict_type(data, "id", str)
+
+    @classmethod
+    def assert_new_game_info(cls, data: Dict[str, Any]) -> None:
+        assert_dict_value(data, "type_", "NewGameInfo", str)
+        assert_dict_type(data, "player", dict)
+        cls.assert_player(data["player"])
+        assert_dict_type(data, "levelset", dict)
+        cls.assert_levelset(data["levelset"])
+
 
 @pytest.fixture
 def setup_and_teardown():
@@ -268,6 +285,11 @@ def game_id() -> str:
 
 
 @pytest.fixture
+def levelset_id() -> str:
+    return "main"
+
+
+@pytest.fixture
 def level_id() -> str:
     return "1"
 
@@ -280,6 +302,11 @@ def filename() -> str:
 @pytest.fixture
 def invalid_game_id() -> str:
     return "__INVALID_GAME_ID__"
+
+
+@pytest.fixture
+def invalid_levelset_id() -> str:
+    return "__INVALID_LEVELSET_ID__"
 
 
 @pytest.fixture

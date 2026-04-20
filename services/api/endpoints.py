@@ -30,8 +30,11 @@ async def get_games() -> List[models.IdType]:
 @router.post(
     "/games/new", response_model=models.Game, status_code=status.HTTP_201_CREATED
 )
-async def post_new_game(player: models.Player) -> Union[models.Game, Response]:
-    return controllers.GameController.new_game(player)
+async def post_new_game(
+    new_game_info: models.NewGameInfo,
+) -> Union[models.Game, Response]:
+    game = controllers.GameController.new_game(new_game_info)
+    return game
 
 
 @router.get(
@@ -58,6 +61,15 @@ async def delete_game(game_id: models.IdType) -> Union[None, Response]:
 
 
 # -- levels -------------------------------------------------------------------
+
+
+@router.get(
+    "/levelsets", response_model=List[models.Levelset], status_code=status.HTTP_200_OK
+)
+async def get_levelsets() -> List[models.Levelset]:
+    levelsets = controllers.LevelController.get_levelsets()
+    print(levelsets)
+    return levelsets
 
 
 @router.get(

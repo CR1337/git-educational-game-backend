@@ -1,0 +1,26 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./services/api/Dockerfile
+    user: "1000:1000"
+    env_file:
+      - .env
+    volumes:
+      - ./volumes/game_data:/game_data
+
+  nginx:
+    build:
+      context: .
+      dockerfile: ./services/nginx/Dockerfile
+    ports: 
+      - 8080:8080
+    volumes: 
+      - ./volumes/game:/usr/share/nginx/html
+    depends_on:
+      - api
+
+
+volumes:
+  game_data:
+  game:

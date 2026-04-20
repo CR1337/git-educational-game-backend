@@ -6,6 +6,14 @@ from tests.conftest import (
 )
 
 
+def test_get_level_sets(setup_and_teardown) -> None:
+    status, data = make_request("get", "/levelsets")
+
+    assert status == 200
+    assert isinstance(data, list)
+    assert all(isinstance(id_, str) for id_ in data)
+
+
 def test_get_level_graph(setup_and_teardown, game_id):
     status, data = make_request("get", f"/games/{game_id}/level-graph")
 

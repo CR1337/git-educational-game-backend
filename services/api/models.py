@@ -97,7 +97,7 @@ class Level(BaseModel):
 class LevelGraph(BaseModel):
     type_: Literal["LevelGraph"] = "LevelGraph"
     start_levels: List[LevelNode]
-    edges: Dict[IdType, LevelNode]
+    edges: Dict[IdType, List[LevelNode]]
 
 
 class Player(BaseModel):
@@ -109,6 +109,7 @@ class Game(BaseModel):
     type_: Literal["Game"] = "Game"
     id: IdType
     player: Player
+    levelset: Levelset
 
 
 class GitGraph(BaseModel):
@@ -120,3 +121,14 @@ class GitGraph(BaseModel):
     tags: Dict[str, str]
     commit_messages: Dict[str, str]
     branch_names: Dict[str, str]
+
+
+class Levelset(BaseModel):
+    type_: Literal["Levelset"] = "Levelset"
+    id: IdType
+
+
+class NewGameInfo(BaseModel):
+    type_: Literal["NewGameInfo"] = "NewGameInfo"
+    player: Player
+    levelset: Levelset

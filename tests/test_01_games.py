@@ -1,9 +1,13 @@
 from tests.conftest import make_request, ModelAssertions, assert_dict_value
 
 
-def test_new_game(setup_and_teardown):
+def test_new_game(setup_and_teardown, levelset_id):
     player_name = "player"
-    payload = {"type_": "Player", "name": player_name}
+    payload = {
+        "type_": "NewGameInfo",
+        "player": {"name": player_name},
+        "levelset_id": levelset_id,
+    }
     status, data = make_request("post", "/games/new", payload)
 
     assert status == 201

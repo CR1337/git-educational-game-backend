@@ -27,7 +27,7 @@ class GameController:
         ]
 
     @classmethod
-    def new_game(cls, player: models.Player) -> models.Game:
+    def new_game(cls, new_game_info: models.NewGameInfo) -> models.Game:
         game_id = str(uuid.uuid1())
         game_directory = Filesystem.get_game_path(game_id, must_exist=False)
         game_directory.mkdir()
@@ -35,7 +35,8 @@ class GameController:
         meta_filename = Filesystem.get_game_meta_path(game_id, must_exist=False)
         metadata = deepcopy(cls.META_PROTOTYPE)
         metadata["id"] = game_id
-        metadata["player_name"] = player.name
+        metadata["player_name"] = new_game_info.player.name
+        metadata["levelset_id"] = new_game_info.levelset.id
         with open(meta_filename, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=4)
 
@@ -44,11 +45,19 @@ class GameController:
         )
         game_levels_directory.mkdir()
 
-        level_ids = os.listdir(Filesystem.LEVELS_PATH)
+        level_ids = [
+            fn
+            for fn in os.listdir(Filesystem.get_levels_path(new_game_info.levelset.id))
+            if not fn.endswith(".json")
+        ]
         for level_id in level_ids:
             LevelController.reset_level(game_id, level_id)
 
-        game = models.Game(id=game_id, player=player)
+        game = models.Game(
+            id=game_id,
+            player=new_game_info.player,
+            levelset=new_game_info.levelset,
+        )
         return game
 
     @classmethod
@@ -57,7 +66,9 @@ class GameController:
         with open(meta_filename, "r", encoding="utf-8") as f:
             metadata = json.load(f)
         game = models.Game(
-            id=metadata["id"], player=models.Player(name=metadata["player_name"])
+            id=metadata["id"],
+            player=models.Player(name=metadata["player_name"]),
+            levelset=models.Levelset(id=metadata["levelset_id"]),
         )
         return game
 
@@ -70,6 +81,11 @@ class GameController:
 class LevelController:
 
     META_PROTOTYPE: Dict[str, Any] = {"started": False, "solved": False}
+    DEFAULT_LEVELSET_ID: models.IdType = "main"
+
+    @classmethod
+    def get_levelsets(cls) -> List[models.Levelset]:
+        return [models.Levelset(id=d) for d in os.listdir(Filesystem.LEVELSETS_PATH)]
 
     @classmethod
     def get_level_graph(cls, game_id: models.IdType) -> models.LevelGraph:
@@ -96,13 +112,16 @@ class LevelController:
 
     @classmethod
     def get_levels(cls, game_id: models.IdType) -> List[models.LevelNode]:
+        levelset_id = GameController.get_game(game_id).levelset.id
         levels_directory = Filesystem.get_game_levels_path(game_id)
         level_ids = os.listdir(levels_directory)
 
         level_nodes = []
 
         for level_id in level_ids:
-            level_metadata_filename = Filesystem.get_level_meta_path(level_id)
+            level_metadata_filename = Filesystem.get_level_meta_path(
+                levelset_id, level_id
+            )
             with open(level_metadata_filename, "r", encoding="utf-8") as f:
                 level_metadata = json.load(f)
 
@@ -125,7 +144,8 @@ class LevelController:
 
     @classmethod
     def get_level(cls, game_id: models.IdType, level_id: models.IdType) -> models.Level:
-        level_metadata_filename = Filesystem.get_level_meta_path(level_id)
+        levelset_id = GameController.get_game(game_id).levelset.id
+        level_metadata_filename = Filesystem.get_level_meta_path(levelset_id, level_id)
         with open(level_metadata_filename, "r", encoding="utf-8") as f:
             level_metadata = json.load(f)
 
@@ -153,13 +173,13 @@ class LevelController:
             file = models.File(filename=filename, content=content)
             files.append(file)
 
-        map_filename = Filesystem.get_level_map_path(level_id)
+        map_filename = Filesystem.get_level_map_path(levelset_id, level_id)
         with open(map_filename, "r", encoding="utf-8") as f:
             map_string = f.read().strip()
 
         map_ = models.Map.parse(map_string, level_id)
 
-        text_filename = Filesystem.get_level_text_path(level_id)
+        text_filename = Filesystem.get_level_text_path(levelset_id, level_id)
         with open(text_filename, "r", encoding="utf-8") as f:
             text_data = json.load(f)
 
@@ -179,6 +199,7 @@ class LevelController:
     def reset_level(
         cls, game_id: models.IdType, level_id: models.IdType
     ) -> models.Level:
+        levelset_id = GameController.get_game(game_id).levelset.id
         game_meta_filename = Filesystem.get_game_meta_path(game_id, must_exist=False)
         with open(game_meta_filename, "r", encoding="utf-8") as f:
             game_metadata = json.load(f)
@@ -214,7 +235,7 @@ class LevelController:
         for args in init_git_command_args:
             GitController.run_git_command_directly(game_id, level_id, args)
 
-        init_filename = Filesystem.get_level_init_path(level_id)
+        init_filename = Filesystem.get_level_init_path(levelset_id, level_id)
         with open(init_filename, "r", encoding="utf-8") as f:
             init_commands = f.readlines()
 
@@ -236,7 +257,9 @@ class LevelController:
                 case "write":
                     assert len(args) == 2
                     source, destination = args
-                    source_filename = Filesystem.get_level_file_path(level_id, source)
+                    source_filename = Filesystem.get_level_file_path(
+                        levelset_id, level_id, source
+                    )
                     destination_filename = Filesystem.get_game_level_repo_file(
                         game_id, level_id, destination, must_exist=False
                     )
@@ -354,7 +377,11 @@ class GitController:
     ) -> models.GitResult:
         cwd = Filesystem.get_game_level_repo_path(game_id, level_id)
         git_process = subprocess.Popen(
-            args=["git"] + argv, cwd=cwd, env={"GIT_PAGER": ""}
+            args=["git"] + argv,
+            cwd=cwd,
+            env={"GIT_PAGER": ""},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
         returncode = git_process.wait()
         stdout, stderr = [x.decode() for x in git_process.communicate()]
