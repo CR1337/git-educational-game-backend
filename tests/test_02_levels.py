@@ -11,7 +11,9 @@ def test_get_level_sets(setup_and_teardown) -> None:
 
     assert status == 200
     assert isinstance(data, list)
-    assert all(isinstance(id_, str) for id_ in data)
+    for levelset in data:
+        assert isinstance(levelset, dict)
+        ModelAssertions.assert_levelset(levelset)
 
 
 def test_get_level_graph(setup_and_teardown, game_id):

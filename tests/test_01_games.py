@@ -5,8 +5,8 @@ def test_new_game(setup_and_teardown, levelset_id):
     player_name = "player"
     payload = {
         "type_": "NewGameInfo",
-        "player": {"name": player_name},
-        "levelset_id": levelset_id,
+        "player": {"type_": "Player", "name": player_name},
+        "levelset": {"type_": "Levelset", "id": levelset_id},
     }
     status, data = make_request("post", "/games/new", payload)
 

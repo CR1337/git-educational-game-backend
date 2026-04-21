@@ -5,7 +5,10 @@ import controllers
 from typing import List, Union
 
 
-router: APIRouter = APIRouter()
+if debug.is_in_docker():
+    router: APIRouter = APIRouter()
+else:
+    router: APIRouter = APIRouter(prefix="/api")
 
 
 # -- root ---------------------------------------------------------------------

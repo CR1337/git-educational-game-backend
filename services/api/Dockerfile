@@ -15,7 +15,7 @@ COPY ./services/api .
 
 RUN chmod a+rx /app/git_orchestrator/git_editor
 
-ENV INSIDE_DOCKER=1
+ENV GITGAME_INSIDE_CONTAINER=1
 ENV PATH="/usr/local/bin:${PATH}"
 
 CMD ["bash", "./entrypoint.sh"]

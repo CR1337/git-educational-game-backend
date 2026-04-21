@@ -1,0 +1,8 @@
+#!/bin/bash
+
+bin/running
+if [ $? -eq 0 ]; then
+  {{ container_runtime }} compose down
+else
+  echo "Not running."
+fi

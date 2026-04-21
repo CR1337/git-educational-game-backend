@@ -1,0 +1,16 @@
+#!/bin/bash
+
+ids=$({{ container_runtime }} compose ps -q)
+
+if [ -z "$ids" ]; then
+    exit 1
+fi
+
+for id in $ids; do
+    state=$({{ container_runtime }} inspect -f '{{ '{{' }}.State.Running{{ '}}' }}' "$id" 2>/dev/null)
+    if [ "$state" = "true" ]; then
+        exit 0
+    fi
+done
+
+exit 1

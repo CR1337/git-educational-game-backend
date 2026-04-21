@@ -21,7 +21,7 @@ while getopts ":i" opt; do
 done
 
 if [ "$INTERACTIVE" -eq 1 ]; then
-docker compose up
+{{ container_runtime }} compose up
 else
-docker compose up -d
+{{ container_runtime }} compose up -d
 fi

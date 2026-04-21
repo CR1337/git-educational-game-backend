@@ -89,9 +89,12 @@ class LevelController:
 
     @classmethod
     def get_level_graph(cls, game_id: models.IdType) -> models.LevelGraph:
+        levelset_id = GameController.get_game(game_id).levelset.id
         level_nodes = {node.id: node for node in cls.get_levels(game_id)}
 
-        with open(Filesystem.LEVEL_GRAPH_PATH, "r", encoding="utf-8") as f:
+        with open(
+            Filesystem.get_level_graph_path(levelset_id), "r", encoding="utf-8"
+        ) as f:
             graph_id_data = json.load(f)
 
         start_levels = [
@@ -399,6 +402,27 @@ class GitController:
         interface = cls._get_git_interface(game_id, level_id, editor_response.id)
         return interface.send_editor_response(editor_response)
 
+    @staticmethod
+    def _split(string: str) -> List[str]:
+        result = []
+        current = []
+        in_quotes = False
+
+        for char in string:
+            if char == '"':
+                in_quotes = not in_quotes
+            elif char == " " and not in_quotes:
+                if current:
+                    result.append("".join(current))
+                    current = []
+            else:
+                current.append(char)
+
+        if current:
+            result.append("".join(current))
+
+        return result
+
     @classmethod
     def get_git_graph(
         cls, game_id: models.IdType, level_id: models.IdType
@@ -413,7 +437,7 @@ class GitController:
         if result.returncode != 0:
             return None
         for line in result.stdout.splitlines():
-            hash_, message, *parent_hashes = line.strip().split()
+            hash_, message, *parent_hashes = cls._split(line.strip())
             nodes.append(hash_)
             parents[hash_] = []
             for parent in parent_hashes:
@@ -435,23 +459,25 @@ class GitController:
 
         argv = ["show-ref", "--tags", "-d"]
         result = cls.run_git_command_directly(game_id, level_id, argv)
-        if result.returncode != 0:
+        if result.returncode > 1:
             return None
-        for line in result.stdout.splitlines():
-            hash_, raw_tag = line.strip().split()
-            tag = raw_tag.split("/")[-1]
-            tags[hash_] = tag
+        elif result.returncode == 0:
+            for line in result.stdout.splitlines():
+                hash_, raw_tag = cls._split(line.strip())
+                tag = raw_tag.split("/")[-1]
+                tags[hash_] = tag
 
         branch_names: Dict[str, str] = {}
 
         argv = ["show-ref", "--heads"]
         result = cls.run_git_command_directly(game_id, level_id, argv)
-        if result.returncode != 0:
+        if result.returncode > 1:
             return None
-        for line in result.stdout.splitlines():
-            hash_, raw_branch_name = line.strip().split()
-            branch_name = raw_branch_name.split("/")[-1]
-            branch_names[hash_] = branch_name
+        elif result.returncode == 0:
+            for line in result.stdout.splitlines():
+                hash_, raw_branch_name = cls._split(line.strip())
+                branch_name = raw_branch_name.split("/")[-1]
+                branch_names[hash_] = branch_name
 
         graph = models.GitGraph(
             nodes=nodes,

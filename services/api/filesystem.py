@@ -16,7 +16,6 @@ class Filesystem:
 
     GAMES_PATH: Path = Path(GAME_DATA_PATH, "games")
     LEVELSETS_PATH: Path = Path(GAME_DATA_PATH, "levels")
-    LEVEL_GRAPH_PATH: Path = Path(GAME_DATA_PATH, "level_graph.json")
 
     GIT_EDITOR_PATH: Path = (
         Path("/", "app", "git_orchestrator", "git_editor")
@@ -31,7 +30,6 @@ class Filesystem:
     @classmethod
     def get_path(cls, components: List[str | Path], *, must_exist: bool = True) -> Path:
         path = Path(*components)
-        print(f"{path=}")
         if not path.exists() and must_exist:
             raise FileNotFoundError()
         return path

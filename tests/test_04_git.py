@@ -66,6 +66,7 @@ def test_get_git_graph(setup_and_teardown, game_id, level_id):
 
     assert status == 200
     assert isinstance(data, dict)
+    print(data)
     ModelAssertions.assert_git_graph(data)
 
     assert len(data["nodes"]) > 0

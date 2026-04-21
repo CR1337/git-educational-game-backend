@@ -3,23 +3,22 @@ services:
     build:
       context: .
       dockerfile: ./services/api/Dockerfile
-    user: "1000:1000"
+    {% if container_runtime == "docker" %}user: "1000:1000"{% endif %}
     env_file:
       - .env
     volumes:
-      - ./volumes/game_data:/game_data
+      - ./volumes/game_data:/game_data{% if container_runtime  == "podman" %}:z{% endif %}
 
   nginx:
     build:
       context: .
       dockerfile: ./services/nginx/Dockerfile
-    ports: 
+    ports:
       - 8080:8080
-    volumes: 
-      - ./volumes/game:/usr/share/nginx/html
+    volumes:
+      - ./volumes/game:/usr/share/nginx/html{% if container_runtime  == "podman" %}:z{% endif %}
     depends_on:
       - api
-
 
 volumes:
   game_data:

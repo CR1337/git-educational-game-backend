@@ -5,12 +5,12 @@ from fastapi import HTTPException, status
 
 
 def is_in_docker() -> bool:
-    return os.environ.get("INSIDE_DOCKER") == "1"
+    return os.environ.get("GITGAME_INSIDE_CONTAINER") == "1"
 
 
 def in_debug_mode() -> bool:
-    print(f"{os.environ.get('DEBUG_MODE')=}")
-    return os.environ.get("DEBUG_MODE") == "1"
+    print(f"{os.environ.get('GITGAME_DEBUG_MODE')=}")
+    return os.environ.get("GITGAME_DEBUG_MODE") == "1"
 
 
 T = TypeVar("T")

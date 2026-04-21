@@ -61,11 +61,13 @@ def _is_uuid1(string: str) -> bool:
 
 
 def _is_sha(string: str) -> bool:
+    print(f"{string=}")
+    print(f"{len(string)=}")
     if not isinstance(string, str):
         return False
     if len(string) not in (40, 64):
         return False
-    return all(c.lower() in "012345679abcdef" for c in string)
+    return all(c.lower() in "0123456789abcdef" for c in string)
 
 
 def assert_dict_value(
@@ -245,14 +247,10 @@ class ModelAssertions:
             assert all(isinstance(h, str) for h in v)
         assert_dict_type(data, "commit_messages", dict)
         assert all(_is_sha(k) for k in data["commit_messages"].keys())
-        assert all(isinstance(v, list) for v in data["commit_messages"].values())
-        for v in data["commit_messages"].values():
-            assert all(isinstance(h, str) for h in v)
+        assert all(isinstance(v, str) for v in data["commit_messages"].values())
         assert_dict_type(data, "branch_names", dict)
         assert all(_is_sha(k) for k in data["branch_names"].keys())
-        assert all(isinstance(v, list) for v in data["branch_names"].values())
-        for v in data["branch_names"].values():
-            assert all(isinstance(h, str) for h in v)
+        assert all(isinstance(v, str) for v in data["branch_names"].values())
 
     @classmethod
     def assert_levelset(cls, data: Dict[str, Any]) -> None:
@@ -277,7 +275,11 @@ def setup_and_teardown():
 
 @pytest.fixture
 def game_id() -> str:
-    payload = {"type_": "Player", "name": "player"}
+    payload = {
+        "type_": "NewGameInfo",
+        "player": {"type_": "Player", "name": "player"},
+        "levelset": {"type_": "Levelset", "id": "main"},
+    }
     _, data = make_request("post", "/games/new", payload)
     assert data
     game_id = data["id"]
