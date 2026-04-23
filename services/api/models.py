@@ -132,3 +132,9 @@ class NewGameInfo(BaseModel):
     type_: Literal["NewGameInfo"] = "NewGameInfo"
     player: Player
     levelset: Levelset
+
+
+class ServerConfig(BaseModel):
+    type_: Literal["ServerConfig"] = "ServerConfig"
+    debug_mode: bool
+    local: bool

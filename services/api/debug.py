@@ -13,6 +13,10 @@ def in_debug_mode() -> bool:
     return os.environ.get("GITGAME_DEBUG_MODE") == "1"
 
 
+def is_local() -> bool:
+    return os.environ.get("GITGAME_ON_SERVER") != "1"
+
+
 T = TypeVar("T")
 
 

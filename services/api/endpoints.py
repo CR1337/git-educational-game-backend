@@ -19,6 +19,13 @@ async def get_root() -> models.Message:
     return models.Message(message="Hello from the API!")
 
 
+@router.get(
+    "/server-config", response_model=models.ServerConfig, status_code=status.HTTP_200_OK
+)
+async def get_server_config() -> models.ServerConfig:
+    return controllers.RootController.get_server_config()
+
+
 # -- games --------------------------------------------------------------------
 
 

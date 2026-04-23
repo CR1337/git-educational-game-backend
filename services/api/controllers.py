@@ -11,7 +11,17 @@ import uuid
 import os
 import json
 import shutil
+import debug
 from typing import List, Union, Optional, Dict, Any
+
+
+class RootController:
+
+    @classmethod
+    def get_server_config(cls) -> models.ServerConfig:
+        return models.ServerConfig(
+            debug_mode=debug.in_debug_mode(), local=debug.is_local()
+        )
 
 
 class GameController:
@@ -320,7 +330,7 @@ class FileController:
     @classmethod
     def get_files(cls, game_id: models.IdType, level_id: models.IdType) -> List[str]:
         repo_path = Filesystem.get_game_level_repo_path(game_id, level_id)
-        return [fn for fn in os.listdir(repo_path) if not fn.startswith(".")]
+        return sorted([fn for fn in os.listdir(repo_path) if not fn.startswith(".")])
 
     @classmethod
     def get_file(
