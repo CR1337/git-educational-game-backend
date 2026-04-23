@@ -3,3 +3,4 @@
 .pytest_cache
 .env
 docker-compose.yaml
+volumes/game_data/games/**
