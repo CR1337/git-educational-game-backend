@@ -1,4 +1,6 @@
 create bot0.bot
+create bot1.bot
 write bot0.bot bot0.bot
+write bot1.bot bot1.bot
 git add .
 git commit -m "first commit"
