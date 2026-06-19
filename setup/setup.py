@@ -1,4 +1,4 @@
-import os
+import subprocess
 from pathlib import Path
 from typing import Dict, List, Tuple
 from jinja2 import Environment, FileSystemLoader
@@ -71,11 +71,11 @@ def render_templates(parameters: Dict[str, str]) -> None:
 
 
 def set_execution_permissions() -> None:
-    os.system(f"chmod +x {BIN_DIRECTORY.as_posix()}")
+    subprocess.run(["chmod", "+x", BIN_DIRECTORY.as_posix()])
 
 
 def build_containers() -> None:
-    os.system(f"bash {Path(BIN_DIRECTORY, 'build').as_posix()}")
+    subprocess.run(["bash", Path(BIN_DIRECTORY, 'build').as_posix()])
 
 
 def main() -> None:
