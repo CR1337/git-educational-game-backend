@@ -2,110 +2,78 @@
 
 ## Parameters
 
-|Type|Description|Values|
-|-|-|-|
-|Direction (d)|Describes a direction on the map|left, right, up, down, below|
-|Number (n)|An integer|0, 1, 2, 3|
-|Tile (t)|A tile type|robot, walkable, pushable, hot, cold, energized|
+|Type         |Decription             |Values                                                                  |
+|-------------|-----------------------|------------------------------------------------------------------------|
+|Direction (d)|A direcrtion on the map|north, west, east, south, here                                          |
+|Number (n)   |An integer             |0, 1, 2, 3                                                              |
+|Tile (t)     |A tile type            |Robot, Empty, Pushable, Solid, Item, Interactable, <specific tile type> |
 
 ## Commands
 
 ### Movement
 
-|Command|Description|
-|-|-|
-|move d|move (and push) in direction d|
-|dash d|move (and push) two tiles in direction d, costs energy|
+|Command|Description                   |
+|-------|------------------------------|
+|move d |move (and push) in direction d|
 
-### Iteraction
+### Interaction
 
-|Command|Description|
-|-|-|
-|pick d|pick up item in direction d|
-|drop d|drop item i direction d|
-|burn d|generates heat in direction d, costs energy|
-|recylce d| recycles trash in direction d|
-
-### Program flow
-
-|Command|Description|
-|-|-|
-|wait [n]|do nothing [for n ticks]|
-|yield [n]|pass controll flow to next robot [or to robot n]|
-|halt|stop program execution completely|
-|label n|declares the label n|
-|test d t|sets internal flag to true if neighbor in direction d is tile type t else false|
-|jump n|unconditionally jump to label n|
-|jump_if n|jump to label n if internal flag is true|
-|jump_if_not n|jump to label n if internal flag is false|
+|Command   |Description                                                         |
+|----------|--------------------------------------------------------------------|
+|pick d    |pick up item indirection d                                          |
+|drop d    |drop item in direction d                                            |
+|scan d t n|set flag n to 1 if tile in direction d is of type t else set it to 0|
 
 ### Memory
-|Command|Description|
-|-|-|
-|set|sets internal flag to true|
-|clear|sets internal flag to false|
-|toggle|toggles internal flag|
+
+|Command |Description    |
+|--------|---------------|
+|set n   |set flag n to 1|
+|clear n |set flag n to 0|
+|toggle n|toggle flag n  |
 
 ### Signals
-|Command|Description|
-|-|-|
-|signal n|sends the signal n|
-|listen n|waits until signal n is received|
-|poll n|sets internal flag to true if signal n was received else false|
-|clear_signals|clear all received signals|
 
-## Map
+|Command   |Description                                                   |
+|----------|--------------------------------------------------------------|
+|signal n  |send signal n                                                 |
+|listen n  |wait until signal n was received                              |
+|poll n1 n2|set flag n2 to the state of signal n1, then set signal n1 to 0|
 
-|Tile|Description|Pushable|
-|-|-|-|
-|0-3|robots 0-3|yes|
-|.|empty tile|Empty|no|
-|#|wall - cannot be walked on or pushed|no|
-|=|pushable box - can be pushed|yes|
-|$|source - must be pushed to destination|yes|
-|!|destination - win when sources stand an a destination|no|
-|?|subgoal - turns into activates subgoal when source is pushed over it|no|
-|&|activated subgoal - must be activated in order to win|no|
-|<|left conveyer - moves pushables to the left|no|
-|>|right conveyer - moves pushables to the right|no|
-|^|up conveyer - moves pushables up|no|
-|v|down conveyer - moves pushables down|no|
-|K|key - opens a lock if a robot carrying it walks onto the lock|no|
-|L|lock - see key|no|
-|w-z|pressure plates - holds open corresponding door when pushable stands on it|no|
-|W-Z|doors - see pressure plates|no|
+### Waiting
 
-|~|ice - pushables glide on it, can be melted|no|
-|*|ice block - cannot be passed until melted|no|
-|B|battery - robot can perform one energy requireing command|
-|E|power supply - robot can perform energy requireing commands while neighboring|
-|b|trash - turns into fire when burned, vanishes when recycled|no|
-|f|fire - melts neighboring ice, burns neighboring trash, vanishes|no| 
+|Command|Description                    |
+|-------|-------------------------------|
+|wait   |do nothing                     |
+|next   |pass control to the next robot |
+|yield n|pass control to robot n        |
+|halt   |stop program execution entirely|
 
+### Program Flow
 
-|4-8|heater - burns the neighbors after 4-8 ticks after activation, activated by burning or energizing|yes|
-|h,j,k,l|power plant - drops battery in corresponding direction when heated for 3 ticks|
+|Command      |Description                     |
+|-------------|--------------------------------|
+|label n      |declare a label called n        |
+|jump n       |unconditionally jump to label n |
+|jump_if n1 n2|jump to label n1 of flag n2 is 1|
 
-### Example Map
+## Tiles
 
-```
-16 16
-################
-#..............#
-#.w............#
-#..............#
-#..............#
-#............W.#
-#..............#
-#..............#
-#..............#
-#..............#
-#..............#
-#..............#
-#..............#
-#..............#
-#..............#
-################
-2 2 *
-```
-
+|Symbol|Name             |Type                |Layer|Description                                                                                            |
+|------|-----------------|--------------------|-----|-------------------------------------------------------------------------------------------------------|
+|0-3   |Robot            |Robot               |    1|One of four robots.                                                                                    |
+|.     |Empty tile       |Empty               |    0|An empty tile.                                                                                         |
+|#     |Wall             |Solid               |    0|A solid wall.                                                                                          |
+|=     |Box              |Pushable            |    1|A box that can be pushed.                                                                              |
+|$     |Source           |Pushable            |    1|A special object that can be pushed.                                                                   |
+|!     |Destination      |Empty               |    0|The destination for special objects to be pushed on. To win all sources must be pushed to destinations.|
+|?     |Subgoal          |Empty               |    0|A sub destination for special objects to be pushed on which toggles the activation of the subgoal.     |
+|&     |Activated subgoal|Empty               |    0|To win all subgoals must be activated.                                                                 |
+|K     |Key              |Item                |    1|Can be picked up to open a lock.                                                                       |
+|L     |Lock             |Interactable, Solid |    1|Can be opened by dropping a key on it.                                                                 |
+|w-z   |Pressure Plate   |Interactable        |    0|Opens the corresponding door by placing a robot or a pushable on it.                                   |
+|W-Z   |Door             |Solid               |    1|Is opened by the corresponding pressure plate.                                                         |
+|<     |Left conveyer    |Empty               |    0|Moves an robot or pusshable to the left.                                                               |
+|>     |Right conveyer   |Empty               |    0|Moves an robot or pusshable to the right.                                                              |
+|^     |Up conveyer      |Empty               |    0|Moves an robot or pusshable to up.                                                                     |
+|v     |Down conveyer    |Empty               |    0|Moves an robot or pusshable to down.                                                                   |
