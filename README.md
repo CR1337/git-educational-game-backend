@@ -2,7 +2,7 @@
 
 ## Setup (Linux only)
 
-1. Install [docker](https://docs.docker.com/engine/install/) or [podman](https://podman.io/docs/installation).
+1. Install [docker](https://docs.docker.com/engine/install/) or [podman](https://podman.io/docs/installation). Also install `docker-compose` or `podman-compose` and add your user to the docker group.
 
 2. Place the exported game files into `volumes/game/`.
 
