@@ -1,4 +1,4 @@
-# Level Template Structure
+# Level Representation
 
 ## map.txt
 
@@ -7,8 +7,15 @@
 ###
 #.#
 ###
-1 1 *
+1 1 1
 ```
+
+|Line  |Description                                                       |
+|------|------------------------------------------------------------------|
+|1     |Width (w) and Height (h) of the map.                              |
+|2..h+1|Immovable tiles arranged in a 2d grid.                            |
+|h+2.. |Each line contains an x position, a y position and a movable tile.|
+
 
 ## text.json
 

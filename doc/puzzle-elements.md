@@ -2,16 +2,16 @@
 
 ## Tiles
 
-|Symbol|Name       |Description                                                                    |
-|------|-----------|-------------------------------------------------------------------------------|
-| 1-4  |Robots     |Robots are controlled by the players programs.                                 |
-|   #  |Wall       |A Wall is an immovable object.                                                 |
-|   +  |Box        |A Box can be pushed by a Robot.                                                |
-|   .  |Empty      |This is an empty tile.                                                         |
-|   *  |Destination|The Level is solved when each destination has a box on it.                     |
-| 5-8  |Mark       |These can be placed, removed and read by Robots. Each ribit has its own type   |
-| a-z  |Buttons    |A Button opens the corresponding door(s) when a Robot or a Box is placed on it.|
-| A-Z  |Doors      |See Buttons.                                                                   |
+|Symbol|Name       |Description                                                                    |Movable|
+|------|-----------|-------------------------------------------------------------------------------|-------|
+| 1-4  |Robots     |Robots are controlled by the players programs.                                 |yes    |
+|   #  |Wall       |A Wall is an immovable object.                                                 |no     |
+|   +  |Box        |A Box can be pushed by a Robot.                                                |yes    |
+|   .  |Empty      |This is an empty tile.                                                         |no     |
+|   *  |Destination|The Level is solved when each destination has a box on it.                     |no     |
+| 5-8  |Mark       |These can be placed, removed and read by Robots. Each ribit has its own type   |yes    |
+| a-z  |Buttons    |A Button opens the corresponding door(s) when a Robot or a Box is placed on it.|no     |
+| A-Z  |Doors      |See Buttons.                                                                   |no     |
 
 ## Programs
 
