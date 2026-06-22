@@ -43,3 +43,4 @@ Each Robot has two one bit registers A and B.
 |Jumps   |Label   |Number             |Declare a label.                                                       |
 |        |Jump    |Number             |Jump to the label.                                                     |
 |        |Branch  |Number             |Jump to the label if A is 1.                                           |
+|Misc    |Nop     |                   |No operation                                                           |
